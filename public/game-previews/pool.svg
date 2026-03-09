@@ -1,0 +1,16 @@
+<svg width="720" height="540" viewBox="0 0 720 540" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="720" height="540" rx="36" fill="#17353C"/>
+  <rect x="52" y="46" width="616" height="448" rx="36" fill="#0E5A52" stroke="#8E5F34" stroke-width="20"/>
+  <circle cx="90" cy="84" r="18" fill="#0A1D1B"/>
+  <circle cx="630" cy="84" r="18" fill="#0A1D1B"/>
+  <circle cx="90" cy="456" r="18" fill="#0A1D1B"/>
+  <circle cx="630" cy="456" r="18" fill="#0A1D1B"/>
+  <circle cx="536" cy="270" r="18" fill="#F6F5EE"/>
+  <circle cx="424" cy="242" r="18" fill="#F0C84D"/>
+  <circle cx="458" cy="286" r="18" fill="#EF6C53"/>
+  <circle cx="492" cy="242" r="18" fill="#5DB8FF"/>
+  <path d="M156 344L494 278" stroke="#F7E7C7" stroke-width="14" stroke-linecap="round"/>
+  <path d="M494 278L566 262" stroke="#FFF7E2" stroke-width="4" stroke-dasharray="14 12"/>
+  <rect x="84" y="72" width="138" height="62" rx="20" fill="#0D2B2C" fill-opacity="0.58"/>
+  <text x="112" y="111" fill="#FFF7E2" font-family="Trebuchet MS, sans-serif" font-size="26" font-weight="700">Power 72%</text>
+</svg>

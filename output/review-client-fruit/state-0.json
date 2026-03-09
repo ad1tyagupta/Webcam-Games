@@ -1,0 +1,1 @@
+{"route":"/play/fruit-ninja","mode":"playing","coordinateSystem":"canvas origin at top-left, x increases right, y increases down","score":0,"misses":1,"fruits":[{"id":2,"kind":"fruit","x":317,"y":405,"radius":37.42084743237713},{"id":3,"kind":"fruit","x":558,"y":450,"radius":34.13453420506995}],"pointer":{"x":490,"y":151},"tracking":{"status":"ready","source":"debug"}}

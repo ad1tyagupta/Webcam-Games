@@ -1,0 +1,78 @@
+Original prompt: I want to build a website which has multiple games that can be controlled through webcam. For example, one game could be Snake, where if I change the direction of my fingers, then it changes the direction of snake going. Then the second game could be Fruit Ninja, where my fingers could be, fingers could control the sword cutting the fruits. And the third game could be a pool table game, where my fingers, fingers control the stick and also the strength of or the power of the stick. And the fourth game could be a mini golf. I want to brainstorm on how this website would look like and how these games will function. And then we will tackle each of these games one by one.
+
+2026-03-08
+- Initialized project tracking for Webcam Arcade v1.
+- Locked implementation target: React + TypeScript + Vite SPA with playable Snake, shared webcam tracking layer, and polished placeholder pages for Fruit Ninja, Pool, and Mini Golf.
+- Next step: scaffold the app and verify a runnable baseline before adding tracking/game logic.
+- Scaffolded the Vite React TypeScript app into the project root and installed runtime/test dependencies.
+- Verified the unmodified baseline with the Playwright client; screenshot captured at `output/baseline/shot-0.png`.
+- Next step: replace the starter app with routed arcade screens and shared tracking/game architecture.
+- Replaced the starter app with a routed Webcam Arcade shell, landing page, calibration flow, hub, placeholder concept pages, and a playable Snake canvas.
+- Added a shared session/tracker layer, MediaPipe browser tracker adapter, simulated debug hand feed, window test hooks, and keyboard fallback for deterministic validation.
+- Added unit tests for snake logic, snake gesture smoothing, and hand-math derivation. `npm run test:run`, `npm run lint`, and `npm run build` all pass.
+- Browser validation artifacts captured with the Playwright client:
+  - landing: `output/root/shot-0.png`
+  - calibration ready state: `output/calibration-ready/shot-0.png`
+  - hub: `output/hub-final/shot-0.png`
+  - snake gameplay: `output/snake/shot-0.png`
+- Next TODOs:
+  - replace remote MediaPipe model loading with local bundled assets if offline support is needed
+  - build Fruit Ninja on top of the shared `HandFrame` and routing shell
+  - add richer camera/manual smoke coverage on actual hardware before public deployment
+- Feedback iteration:
+  - simplified the entry page to a title plus four image-backed game options
+  - reduced header clutter on the selector page and game pages
+  - switched the preview marker to the fingertip position instead of the palm/base area
+  - mirrored the derived x-coordinates so the fingertip marker and horizontal controls match the mirrored webcam view
+  - added automatic camera request on Snake route entry
+- Updated browser validation artifacts:
+  - simplified home selector: `output/root-simple/shot-0.png`
+  - fingertip calibration marker: `output/calibration-fingertip/shot-0.png`
+  - updated snake gameplay: `output/snake-updated/shot-0.png`
+- Multi-game implementation chunk:
+  - added a shared in-game camera card with live preview, green fingertip dot, auto camera request, and dev simulation button
+  - converted Fruit Ninja, Pool, and Mini Golf from concept placeholders into playable canvas games
+  - standardized Snake onto the same game layout so all four games now show gameplay + camera feed together
+  - marked all four game tiles as playable on the selector screen
+- Validation pass for the multi-game build:
+  - reran deterministic game checks with the Playwright web-game client for Snake, Fruit Ninja, Pool, and Mini Golf
+  - captured full-page browser screenshots after enabling the simulated hand feed to verify the in-page camera card and green fingertip marker on every game route
+  - confirmed mirrored horizontal movement now matches the mirrored webcam view because the derived fingertip x-coordinate and pointer vector are flipped before game input mapping
+- Latest validation artifacts:
+  - full-page Snake: `output/fullpage-games/snake.png`
+  - full-page Fruit Ninja: `output/fullpage-games/fruit-ninja.png`
+  - full-page Pool: `output/fullpage-games/pool.png`
+  - full-page Mini Golf: `output/fullpage-games/mini-golf.png`
+- Layout refinement:
+  - converted the shared game page into a real two-column stage layout so the webcam card sits directly beside the game canvas on desktop
+  - moved the control/info panel underneath the stage to reduce dead space and keep the gameplay + camera feed as the primary focus
+  - kept the mobile fallback stacked so smaller screens still remain usable
+- Updated layout validation artifacts:
+  - Snake stage layout: `output/layout-fullpage/snake.png`
+  - Fruit Ninja stage layout: `output/layout-fullpage/fruit-ninja.png`
+  - Pool stage layout: `output/layout-fullpage/pool.png`
+  - Mini Golf stage layout: `output/layout-fullpage/mini-golf.png`
+- Remaining TODOs:
+  - run one manual smoke test with a real webcam in each game to confirm live fingertip tracking quality outside debug mode
+  - tune individual game difficulty/feel now that all four routes are playable
+
+2026-03-09
+- Designed the mini-golf upgrade to use a real putt gesture: pinch near the ball, drag backward while pinched, and launch on release.
+- Locked the rendering direction to a richer 2.5D canvas pass instead of a full renderer rewrite.
+- Saved design doc: `docs/plans/2026-03-09-mini-golf-pinch-realism-design.md`
+- Saved implementation plan: `docs/plans/2026-03-09-mini-golf-pinch-realism.md`
+- Constraint noted: this workspace is not inside a git repository, so plan/design commits are blocked.
+- Next TODOs:
+  - add pinch-center derived tracking data and tests
+  - add a stable mini-golf gesture controller with debounce/cancel coverage
+  - update the mini-golf engine and renderer, then validate with Playwright screenshots
+2026-03-09
+- Approved a Fruit Ninja-specific upgrade direction before implementation:
+  - bright cartoon fruit visuals
+  - improved fingertip smoothing and slash detection
+  - higher fruit launches for longer reaction time
+  - seven lives instead of three
+  - on-canvas start/pause/resume controls that can be triggered by fingertip input
+- Wrote the design doc at `docs/plans/2026-03-09-fruit-ninja-upgrade-design.md`.
+- Wrote the implementation plan at `docs/plans/2026-03-09-fruit-ninja-upgrade.md`.
+- Next step: execute the plan with TDD and validate the Fruit Ninja route with the Playwright web-game client plus screenshot review.

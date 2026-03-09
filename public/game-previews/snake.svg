@@ -1,0 +1,33 @@
+<svg width="720" height="540" viewBox="0 0 720 540" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="720" height="540" rx="36" fill="#141E48"/>
+  <rect x="32" y="32" width="656" height="476" rx="28" fill="url(#bg)"/>
+  <g opacity="0.26" stroke="#EEF4FF">
+    <path d="M32 100H688"/>
+    <path d="M32 168H688"/>
+    <path d="M32 236H688"/>
+    <path d="M32 304H688"/>
+    <path d="M32 372H688"/>
+    <path d="M32 440H688"/>
+    <path d="M100 32V508"/>
+    <path d="M168 32V508"/>
+    <path d="M236 32V508"/>
+    <path d="M304 32V508"/>
+    <path d="M372 32V508"/>
+    <path d="M440 32V508"/>
+    <path d="M508 32V508"/>
+    <path d="M576 32V508"/>
+    <path d="M644 32V508"/>
+  </g>
+  <rect x="72" y="64" width="156" height="74" rx="24" fill="#1C2A63"/>
+  <text x="104" y="110" fill="#F7FBFF" font-family="Trebuchet MS, sans-serif" font-size="28" font-weight="700">Score 12</text>
+  <circle cx="512" cy="236" r="28" fill="#FF694F"/>
+  <rect x="232" y="344" width="56" height="56" rx="20" fill="#2E8FFF"/>
+  <rect x="296" y="344" width="56" height="56" rx="20" fill="#10285D"/>
+  <rect x="360" y="344" width="56" height="56" rx="20" fill="#10285D"/>
+  <defs>
+    <linearGradient id="bg" x1="32" y1="32" x2="688" y2="508" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF7D9"/>
+      <stop offset="1" stop-color="#FFD7F4"/>
+    </linearGradient>
+  </defs>
+</svg>
