@@ -35,4 +35,14 @@ describe('snakeInput', () => {
     const interpreter = createSnakeGestureInterpreter()
     expect(interpreter.next(makeHandFrame({ x: 0, y: -1 }, 0), 'left')).toBe('left')
   })
+
+  it('supports a more sensitive dead zone when configured', () => {
+    const interpreter = createSnakeGestureInterpreter({
+      confirmationFrames: 1,
+      cooldownMs: 0,
+      deadZone: 0.08,
+    })
+
+    expect(interpreter.next(makeHandFrame({ x: 0.1, y: 0.02 }, 0), 'none')).toBe('right')
+  })
 })

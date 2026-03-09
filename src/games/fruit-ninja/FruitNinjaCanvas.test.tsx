@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createEmptyHandFrame } from '../../tracking/handMath'
-import { MiniGolfCanvas } from './MiniGolfCanvas'
+import { FruitNinjaCanvas } from './FruitNinjaCanvas'
 
 const mockUseArcadeSession = vi.fn()
 
@@ -22,7 +22,7 @@ function makeSession() {
   }
 }
 
-describe('MiniGolfCanvas', () => {
+describe('FruitNinjaCanvas', () => {
   const originalRequestAnimationFrame = window.requestAnimationFrame
   const originalCancelAnimationFrame = window.cancelAnimationFrame
   const originalGetContext = HTMLCanvasElement.prototype.getContext
@@ -53,14 +53,20 @@ describe('MiniGolfCanvas', () => {
       save: vi.fn(),
       restore: vi.fn(),
       translate: vi.fn(),
+      rotate: vi.fn(),
       scale: vi.fn(),
       ellipse: vi.fn(),
-      set fillStyle(_value: string) {},
-      set strokeStyle(_value: string) {},
+      quadraticCurveTo: vi.fn(),
+      bezierCurveTo: vi.fn(),
+      setLineDash: vi.fn(),
+      clip: vi.fn(),
+      set fillStyle(_value: string | CanvasGradient) {},
+      set strokeStyle(_value: string | CanvasGradient) {},
       set lineWidth(_value: number) {},
       set font(_value: string) {},
       set textAlign(_value: CanvasTextAlign) {},
       set lineCap(_value: CanvasLineCap) {},
+      set lineJoin(_value: CanvasLineJoin) {},
       set globalAlpha(_value: number) {},
     }
     Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
@@ -79,15 +85,14 @@ describe('MiniGolfCanvas', () => {
     window.__arcadeActiveGameRuntime = null
   })
 
-  it('renders the mini golf scene shell and registers the active runtime', () => {
+  it('renders the fruit ninja shell inside the shared stage with a visible start action', () => {
     render(
       <MemoryRouter>
-        <MiniGolfCanvas />
+        <FruitNinjaCanvas />
       </MemoryRouter>,
     )
 
-    expect(screen.getByRole('heading', { name: 'Putt Parade' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Mini golf course')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Fruit Splash' })).toBeInTheDocument()
     expect(screen.getByTestId('game-stage-rail')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /start game/i })).toBeInTheDocument()
     expect(window.__arcadeActiveGameRuntime).toBeTruthy()

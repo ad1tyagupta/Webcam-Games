@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { GameCameraCard } from '../../components/GameCameraCard'
+import { GameStageLayout } from '../../components/GameStageLayout'
+import { GameUiCursor } from '../../components/GameUiCursor'
 import { registerActiveGameRuntime } from '../../runtime/windowBindings'
 import { useArcadeSession } from '../../session/ArcadeSession'
 import type { HandFrame, Vector2 } from '../../types/arcade'
 import { createEmptyHandFrame, pinchStateFromDistance } from '../../tracking/handMath'
-import { movePointer, pinchStateFromKeyboard, toCanvasPoint } from '../common/input'
+import { amplifyNormalizedPoint, movePointer, pinchStateFromKeyboard, toCanvasPoint } from '../common/input'
+import { useGameUiCursor } from '../common/useGameUiCursor'
 import { createMiniGolfEngine, type MiniGolfState } from './miniGolfEngine'
 import { createMiniGolfGestureController } from './miniGolfGesture'
 
 const WIDTH = 720
 const HEIGHT = 540
 const START_RADIUS = 88
+const HAND_POINTER_GAIN = { x: 1.74, y: 1.74 }
 
 function drawRoundedRect(
   ctx: CanvasRenderingContext2D,
@@ -366,6 +369,23 @@ function drawScene(
   }
 }
 
+function drawStageOverlay(canvas: HTMLCanvasElement, title: string, detail: string) {
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    return
+  }
+
+  ctx.fillStyle = 'rgba(5, 18, 10, 0.48)'
+  ctx.fillRect(0, 0, WIDTH, HEIGHT)
+  ctx.fillStyle = '#f7f2de'
+  ctx.textAlign = 'center'
+  ctx.font = '800 42px "Trebuchet MS", sans-serif'
+  ctx.fillText(title, WIDTH / 2, HEIGHT / 2 - 14)
+  ctx.font = '600 18px "Trebuchet MS", sans-serif'
+  ctx.fillText(detail, WIDTH / 2, HEIGHT / 2 + 24)
+  ctx.textAlign = 'start'
+}
+
 function sameState(a: MiniGolfState, b: MiniGolfState) {
   return (
     a.mode === b.mode &&
@@ -381,6 +401,7 @@ function sameState(a: MiniGolfState, b: MiniGolfState) {
 
 export function MiniGolfCanvas() {
   const { handFrame } = useArcadeSession()
+  const stageRef = useRef<HTMLElement | null>(null)
   const handFrameRef = useRef<HandFrame>(createEmptyHandFrame('idle'))
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const pointerRef = useRef<Vector2>({ x: 220, y: 360 })
@@ -388,14 +409,21 @@ export function MiniGolfCanvas() {
   const animationFrameRef = useRef(0)
   const lastTimestampRef = useRef(0)
   const pressedKeysRef = useRef<Set<string>>(new Set())
+  const stageModeRef = useRef<'title' | 'playing' | 'paused'>('title')
   const engine = useMemo(() => createMiniGolfEngine(), [])
   const gestureController = useMemo(() => createMiniGolfGestureController({ startRadius: START_RADIUS }), [])
   const walls = useMemo(() => engine.getWalls(), [engine])
   const [state, setState] = useState(() => engine.getState())
+  const [stageMode, setStageMode] = useState<'title' | 'playing' | 'paused'>('title')
+  const cursor = useGameUiCursor(stageRef, handFrame)
 
   useEffect(() => {
     handFrameRef.current = handFrame
   }, [handFrame])
+
+  useEffect(() => {
+    stageModeRef.current = stageMode
+  }, [stageMode])
 
   const syncState = useCallback(() => {
     const nextState = engine.getState()
@@ -414,6 +442,7 @@ export function MiniGolfCanvas() {
   const resetGame = useCallback(() => {
     engine.reset()
     gestureController.reset()
+    setStageMode('title')
     pointerRef.current = { x: 220, y: 360 }
     virtualPointerRef.current = { x: 220, y: 360 }
     syncState()
@@ -427,7 +456,10 @@ export function MiniGolfCanvas() {
       : pinchStateFromKeyboard(pressedKeysRef.current)
     const pointer = usingTrackedHand
       ? toCanvasPoint(
-          rawPinchState === 'pinched' ? activeFrame.derived.pinchCenter : activeFrame.derived.indexTip,
+          amplifyNormalizedPoint(
+            rawPinchState === 'pinched' ? activeFrame.derived.pinchCenter : activeFrame.derived.indexTip,
+            HAND_POINTER_GAIN,
+          ),
           WIDTH,
           HEIGHT,
         )
@@ -441,29 +473,38 @@ export function MiniGolfCanvas() {
 
     pointerRef.current = pointer
 
-    const currentState = engine.getState()
-    const shotEvent = gestureController.update({
-      dtMs,
-      rawPinchState,
-      trackingStatus: usingTrackedHand ? activeFrame.status : 'ready',
-      pointer,
-      ball: currentState.ball,
-      enabled: currentState.mode !== 'rolling' && currentState.mode !== 'win',
-    })
+    if (stageModeRef.current === 'playing') {
+      const currentState = engine.getState()
+      const shotEvent = gestureController.update({
+        dtMs,
+        rawPinchState,
+        trackingStatus: usingTrackedHand ? activeFrame.status : 'ready',
+        pointer,
+        ball: currentState.ball,
+        enabled: currentState.mode !== 'rolling' && currentState.mode !== 'win',
+      })
 
-    engine.update(dtMs, {
-      directionIntent: 'none',
-      pointer,
-      swipeSpeed: 0,
-      pinchState: rawPinchState,
-      trackingStatus: activeFrame.status,
-      shotEvent,
-    })
-    syncState()
+      engine.update(dtMs, {
+        directionIntent: 'none',
+        pointer,
+        swipeSpeed: 0,
+        pinchState: rawPinchState,
+        trackingStatus: activeFrame.status,
+        shotEvent,
+      })
+      syncState()
+    } else {
+      gestureController.reset()
+    }
 
     const canvas = canvasRef.current
     if (canvas) {
       drawScene(canvas, engine.getState(), pointerRef.current, activeFrame.status, walls)
+      if (stageModeRef.current === 'title') {
+        drawStageOverlay(canvas, 'Course ready', 'Pinch the start button to step onto the first hole.')
+      } else if (stageModeRef.current === 'paused') {
+        drawStageOverlay(canvas, 'Paused round', 'Resume when your next putt line feels right.')
+      }
     }
   }, [engine, gestureController, syncState, walls])
 
@@ -517,6 +558,7 @@ export function MiniGolfCanvas() {
             y: Math.round(pointerRef.current.y),
           },
           shotPreviewActive: currentState.mode === 'pinched' || currentState.mode === 'dragging',
+          sessionMode: stageModeRef.current,
           tracking: {
             status: handFrameRef.current.status,
             source: handFrameRef.current.source,
@@ -543,49 +585,97 @@ export function MiniGolfCanvas() {
     return () => window.cancelAnimationFrame(animationFrameRef.current)
   }, [stepSimulation])
 
-  return (
-    <section className="game-layout">
-      <div className="panel panel--canvas">
-        <canvas
-          ref={canvasRef}
-          width={WIDTH}
-          height={HEIGHT}
-          className="game-canvas"
-          aria-label="Mini golf course"
-        />
+  const displayState = state.mode === 'win' && stageMode === 'playing' ? 'win' : stageMode
+  const primaryLabel =
+    state.mode === 'win'
+      ? 'Play again'
+      : stageMode === 'playing'
+        ? 'Pause game'
+        : stageMode === 'paused'
+          ? 'Resume game'
+          : 'Start game'
+
+  const performPrimaryAction = () => {
+    if (state.mode === 'win') {
+      engine.reset()
+      gestureController.reset()
+      syncState()
+      setStageMode('playing')
+      return
+    }
+
+    setStageMode((current) => (current === 'playing' ? 'paused' : 'playing'))
+  }
+
+  const infoPanel = (
+    <section className="panel game-info-card">
+      <div className="game-info-card__intro">
+        <p className="game-info-card__label">Putt controls</p>
+        <p>Amplified finger travel lets tiny corrections shift the putter line much more aggressively.</p>
       </div>
-      <GameCameraCard debugButtonId="debug-golf-btn" />
-      <section className="panel game-info-card">
-        <span className="eyebrow">Mini Golf</span>
-        <h1>Putt Parade</h1>
-        <div className="status-grid">
-          <div className="status-card">
-            <strong>Strokes</strong>
-            <span>{state.strokes}</span>
-          </div>
-          <div className="status-card">
-            <strong>Power</strong>
-            <span>{Math.round(state.charge * 100)}%</span>
-          </div>
-          <div className="status-card">
-            <strong>State</strong>
-            <span>{state.mode}</span>
-          </div>
+      <div className="status-grid">
+        <div className="status-card">
+          <strong>Strokes</strong>
+          <span>{state.strokes}</span>
         </div>
-        <div className="button-row">
-          <button className="button button--ghost" type="button" onClick={resetGame}>
-            Reset hole
-          </button>
+        <div className="status-card">
+          <strong>Power</strong>
+          <span>{Math.round(state.charge * 100)}%</span>
         </div>
-        <ul className="control-list">
-          <li>Pinch close to the ball to grab the putt.</li>
-          <li>While pinched, drag backward to set direction and power.</li>
-          <li>Release the pinch to strike. Keyboard fallback: move with arrows or WASD, hold Space to grab, pull back, release.</li>
-        </ul>
-        <Link className="button button--ghost" to="/">
-          Back to games
-        </Link>
-      </section>
+        <div className="status-card">
+          <strong>State</strong>
+          <span>{displayState}</span>
+        </div>
+      </div>
+      <div className="button-row">
+        <button
+          id="start-golf-btn"
+          className="button"
+          data-game-ui-id="golf-primary"
+          data-game-ui-target="true"
+          type="button"
+          onClick={performPrimaryAction}
+        >
+          {primaryLabel}
+        </button>
+        <button
+          id="reset-golf-btn"
+          className="button button--ghost"
+          data-game-ui-id="golf-reset"
+          data-game-ui-target="true"
+          type="button"
+          onClick={resetGame}
+        >
+          Reset hole
+        </button>
+      </div>
+      <ul className="control-list">
+        <li>Pinch close to the ball to grab the putt after the round has started.</li>
+        <li>While pinched, drag backward to set direction and power with amplified pointer response.</li>
+        <li>Pinch on the visible buttons to start, pause, resume, or reset the hole.</li>
+      </ul>
     </section>
+  )
+
+  return (
+    <GameStageLayout
+      accent="#7bd968"
+      cameraCard={<GameCameraCard debugButtonId="debug-golf-btn" />}
+      eyebrow="Mini Golf"
+      gameId="mini-golf"
+      infoPanel={infoPanel}
+      overlay={<GameUiCursor cursor={cursor} />}
+      stageRef={stageRef}
+      subtitle="Precision putting with finger-first controls and a stronger response curve."
+      title="Putt Parade"
+    >
+      <canvas
+        ref={canvasRef}
+        width={WIDTH}
+        height={HEIGHT}
+        className="game-canvas"
+        aria-label="Mini golf course"
+      />
+    </GameStageLayout>
   )
 }

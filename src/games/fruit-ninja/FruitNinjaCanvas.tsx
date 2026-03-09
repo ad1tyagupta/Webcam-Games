@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { GameCameraCard } from '../../components/GameCameraCard'
+import { GameStageLayout } from '../../components/GameStageLayout'
+import { GameUiCursor } from '../../components/GameUiCursor'
 import { registerActiveGameRuntime } from '../../runtime/windowBindings'
 import { useArcadeSession } from '../../session/ArcadeSession'
 import type { HandFrame, PinchState, Vector2 } from '../../types/arcade'
 import { createEmptyHandFrame, pinchStateFromDistance } from '../../tracking/handMath'
-import { clamp, movePointer, pinchStateFromKeyboard, toCanvasPoint } from '../common/input'
+import { amplifyNormalizedPoint, clamp, movePointer, pinchStateFromKeyboard, toCanvasPoint } from '../common/input'
+import { useGameUiCursor } from '../common/useGameUiCursor'
 import { createFruitNinjaEngine, type FruitEntity, type FruitNinjaState, type FruitType } from './fruitNinjaEngine'
 
 const WIDTH = 720
@@ -14,6 +16,7 @@ const TRAIL_WINDOW_MS = 160
 const EFFECT_DURATION_MS = 420
 const POINTER_SAMPLE_DISTANCE = 8
 const POINTER_SAMPLE_INTERVAL_MS = 28
+const HAND_POINTER_GAIN = { x: 1.76, y: 1.84 }
 
 type ButtonAction = 'pause' | 'restart' | 'resume' | 'start'
 type PointerSource = 'hand' | 'keyboard' | 'mouse'
@@ -662,10 +665,12 @@ function sameState(a: FruitNinjaState, b: FruitNinjaState) {
 
 export function FruitNinjaCanvas() {
   const { handFrame } = useArcadeSession()
+  const stageRef = useRef<HTMLElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const handFrameRef = useRef<HandFrame>(createEmptyHandFrame('idle'))
   const engine = useMemo(() => createFruitNinjaEngine(), [])
   const [state, setState] = useState(() => engine.getState())
+  const cursor = useGameUiCursor(stageRef, handFrame)
   const pressedKeysRef = useRef<Set<string>>(new Set())
   const animationFrameRef = useRef(0)
   const lastTimestampRef = useRef(0)
@@ -742,14 +747,14 @@ export function FruitNinjaCanvas() {
     }
 
     if (activeFrame.status === 'ready') {
-      const pointer = toCanvasPoint(activeFrame.derived.indexTip, WIDTH, HEIGHT)
+      const pointer = toCanvasPoint(amplifyNormalizedPoint(activeFrame.derived.indexTip, HAND_POINTER_GAIN), WIDTH, HEIGHT)
       virtualPointerRef.current = pointer
       const trail = pushPointerSample('hand', pointer, timestampMs)
-      const swipeSpeed = Math.hypot(activeFrame.derived.swipeVelocity.x, activeFrame.derived.swipeVelocity.y)
+      const swipeSpeed = Math.hypot(activeFrame.derived.swipeVelocity.x, activeFrame.derived.swipeVelocity.y) * 1.25
       return {
         pointer,
         pinchState: pinchStateFromDistance(activeFrame.derived.pinchDistance),
-        slashActive: swipeSpeed > 0.42,
+        slashActive: swipeSpeed > 0.34,
         slashPath: trail.map((sample) => sample.point),
         source: 'hand',
         swipeSpeed,
@@ -1032,64 +1037,82 @@ export function FruitNinjaCanvas() {
   const primaryAction =
     state.mode === 'playing' ? 'pause' : state.mode === 'paused' ? 'resume' : 'start'
 
-  return (
-    <section className="game-layout">
-      <div className="panel panel--canvas">
-        <canvas
-          ref={canvasRef}
-          width={WIDTH}
-          height={HEIGHT}
-          className="game-canvas game-canvas--interactive"
-          onPointerDown={handleCanvasPointerDown}
-          onPointerLeave={handleCanvasPointerLeave}
-          onPointerMove={handleCanvasPointerMove}
-          onPointerUp={handleCanvasPointerUp}
-        />
+  const infoPanel = (
+    <section className="panel game-info-card">
+      <div className="game-info-card__intro">
+        <p className="game-info-card__label">Slash controls</p>
+        <p>Amplified fingertip travel makes short swipes feel dramatic while the blade still stays stable.</p>
       </div>
-      <GameCameraCard debugButtonId="debug-fruit-btn" />
-      <section className="panel game-info-card">
-        <span className="eyebrow">Fruit Ninja</span>
-        <h1>Fruit Splash</h1>
-        <div className="status-grid">
-          <div className="status-card">
-            <strong>Score</strong>
-            <span>{state.score}</span>
-          </div>
-          <div className="status-card">
-            <strong>Lives</strong>
-            <span>{state.livesRemaining}/7</span>
-          </div>
-          <div className="status-card">
-            <strong>State</strong>
-            <span>{state.mode}</span>
-          </div>
-          <div className="status-card">
-            <strong>Tracking</strong>
-            <span>{handFrame.status}</span>
-          </div>
+      <div className="status-grid">
+        <div className="status-card">
+          <strong>Score</strong>
+          <span>{state.score}</span>
         </div>
-        <div className="button-row">
-          <button
-            id="start-fruit-btn"
-            className="button"
-            type="button"
-            onClick={() => performAction(primaryAction)}
-          >
-            {primaryAction === 'pause' ? 'Pause game' : primaryAction === 'resume' ? 'Resume game' : 'Start game'}
-          </button>
-          <button id="pause-fruit-btn" className="button button--ghost" type="button" onClick={() => performAction('restart')}>
-            Restart
-          </button>
+        <div className="status-card">
+          <strong>Lives</strong>
+          <span>{state.livesRemaining}/7</span>
         </div>
-        <ul className="control-list">
-          <li>Fast fingertip swipes cut fruit. Hovering alone does not.</li>
-          <li>Fruit now launches higher, and you have seven lives before the round ends.</li>
-          <li>On-screen Start and Pause buttons can be activated with a pinch, click, or keyboard fallback.</li>
-        </ul>
-        <Link className="button button--ghost" to="/">
-          Back to games
-        </Link>
-      </section>
+        <div className="status-card">
+          <strong>State</strong>
+          <span>{state.mode}</span>
+        </div>
+        <div className="status-card">
+          <strong>Tracking</strong>
+          <span>{handFrame.status}</span>
+        </div>
+      </div>
+      <div className="button-row">
+        <button
+          id="start-fruit-btn"
+          className="button"
+          data-game-ui-id="fruit-primary"
+          data-game-ui-target="true"
+          type="button"
+          onClick={() => performAction(primaryAction)}
+        >
+          {primaryAction === 'pause' ? 'Pause game' : primaryAction === 'resume' ? 'Resume game' : 'Start game'}
+        </button>
+        <button
+          id="pause-fruit-btn"
+          className="button button--ghost"
+          data-game-ui-id="fruit-restart"
+          data-game-ui-target="true"
+          type="button"
+          onClick={() => performAction('restart')}
+        >
+          Restart
+        </button>
+      </div>
+      <ul className="control-list">
+        <li>Fast fingertip swipes cut fruit. Small movements now cover more of the market stage.</li>
+        <li>Pinch on the visible buttons to start, pause, resume, or restart from the game screen.</li>
+        <li>Keyboard fallback still works if you want a manual smoke test.</li>
+      </ul>
     </section>
+  )
+
+  return (
+    <GameStageLayout
+      accent="#ff7a59"
+      cameraCard={<GameCameraCard debugButtonId="debug-fruit-btn" />}
+      eyebrow="Fruit Ninja"
+      gameId="fruit-ninja"
+      infoPanel={infoPanel}
+      overlay={<GameUiCursor cursor={cursor} />}
+      stageRef={stageRef}
+      subtitle="Explosive slash play with a faster, bigger fingertip blade."
+      title="Fruit Splash"
+    >
+      <canvas
+        ref={canvasRef}
+        width={WIDTH}
+        height={HEIGHT}
+        className="game-canvas game-canvas--interactive"
+        onPointerDown={handleCanvasPointerDown}
+        onPointerLeave={handleCanvasPointerLeave}
+        onPointerMove={handleCanvasPointerMove}
+        onPointerUp={handleCanvasPointerUp}
+      />
+    </GameStageLayout>
   )
 }

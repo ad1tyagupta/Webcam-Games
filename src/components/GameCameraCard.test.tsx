@@ -35,6 +35,7 @@ describe('GameCameraCard', () => {
     expect(screen.getByTestId('camera-preview-region')).toBeInTheDocument()
     expect(screen.getByTestId('camera-copy-region')).toBeInTheDocument()
     expect(screen.getByTestId('camera-actions')).toBeInTheDocument()
+    expect(screen.getByText(/pinch to click/i)).toBeInTheDocument()
   })
 
   it('keeps the same regions available when tracker errors are shown', () => {

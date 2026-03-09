@@ -10,6 +10,7 @@ export function GameCameraCard({ debugButtonId }: GameCameraCardProps) {
   const {
     cameraPermission,
     enableDebugTracker,
+    handFrame,
     mediaStream,
     requestCamera,
     trackerError,
@@ -25,15 +26,18 @@ export function GameCameraCard({ debugButtonId }: GameCameraCardProps) {
   }, [cameraPermission, mediaStream, requestCamera, trackerMode])
 
   const showRetry = cameraPermission === 'denied'
+  const pinchReady = handFrame.status === 'ready' && handFrame.derived.pinchDistance < 0.34
   const helperCopy = trackerError
     ? trackerError
-    : 'Move your fingertip. The dot shows the movement input.'
+    : pinchReady
+      ? 'Pinch to click is armed. Release your pinch to target the next button.'
+      : 'Move your fingertip. Pinch to click the on-screen game buttons.'
 
   return (
     <section className="panel game-camera-card">
       <div className="game-camera-card__header">
         <h2>Camera</h2>
-        <span className="game-camera-card__hint">Green dot = fingertip</span>
+        <span className="game-camera-card__hint">Green dot = fingertip aim</span>
       </div>
       <div data-testid="camera-preview-region">
         <WebcamPreview compact />

@@ -1,0 +1,26 @@
+{
+  "route": "/play/mini-golf",
+  "mode": "aim",
+  "coordinateSystem": "canvas origin at top-left, x increases right, y increases down",
+  "strokes": 0,
+  "charge": 0,
+  "ball": {
+    "x": 110,
+    "y": 420
+  },
+  "hole": {
+    "x": 600,
+    "y": 140
+  },
+  "dragPoint": null,
+  "pointer": {
+    "x": 473,
+    "y": 446
+  },
+  "shotPreviewActive": false,
+  "sessionMode": "playing",
+  "tracking": {
+    "status": "ready",
+    "source": "debug"
+  }
+}

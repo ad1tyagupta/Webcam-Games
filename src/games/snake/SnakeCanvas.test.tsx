@@ -86,6 +86,7 @@ describe('SnakeCanvas', () => {
 
     expect(screen.getByRole('heading', { name: 'Snake Signal' })).toBeInTheDocument()
     expect(screen.getByLabelText('Snake terrarium scene')).toBeInTheDocument()
+    expect(screen.getByTestId('game-stage-rail')).toBeInTheDocument()
     expect(window.__arcadeActiveGameRuntime).toBeTruthy()
   })
 })

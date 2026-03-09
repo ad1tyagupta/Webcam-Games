@@ -144,3 +144,41 @@ Original prompt: I want to build a website which has multiple games that can be 
 - Remaining TODOs:
   - run one real-hardware webcam smoke test on Snake outside debug mode
   - decide whether the dev-only `simulateHand=1` hook should be generalized for the other games' automated checks
+2026-03-09
+- Approved and documented the shared sporty-modern refresh:
+  - design doc: `docs/plans/2026-03-09-sporty-modern-game-refresh-design.md`
+  - implementation plan: `docs/plans/2026-03-09-sporty-modern-game-refresh.md`
+- Shared interaction/layout work completed:
+  - added `GameStageLayout` for a consistent in-game header, hero canvas stage, and right-side rail
+  - added a shared in-game cursor + pinch-click controller for `data-game-ui-target` buttons on game pages only
+  - upgraded the global visual language to a darker sporty-modern shell with refreshed landing-page hero and richer game cards
+  - refreshed `GameCameraCard` copy and status presentation for finger-first controls
+- Sensitivity + control changes:
+  - increased Snake responsiveness with a lower gesture dead zone and faster confirmation/cooldown settings
+  - amplified Fruit Ninja, Pool, and Mini Golf pointer motion so smaller finger movement creates larger in-game movement
+  - added visible start buttons to Pool and Mini Golf with local `title/playing/paused` route-level states
+  - verified pinch-click starts/resumes the correct game state on all four game routes
+- Added/updated automated coverage:
+  - `src/components/GameStageLayout.test.tsx`
+  - `src/games/common/gameUiPointer.test.ts`
+  - `src/games/common/input.test.ts`
+  - `src/games/fruit-ninja/FruitNinjaCanvas.test.tsx`
+  - `src/games/pool/PoolCanvas.test.tsx`
+  - `src/games/snake/snakeInput.test.ts`
+  - updated `src/components/GameCameraCard.test.tsx`
+  - updated `src/games/snake/SnakeCanvas.test.tsx`
+  - updated `src/games/mini-golf/MiniGolfCanvas.test.tsx`
+- Verification completed:
+  - focused suite: `npm run test:run -- src/components/GameStageLayout.test.tsx src/components/GameCameraCard.test.tsx src/games/common/gameUiPointer.test.ts src/games/common/input.test.ts src/games/snake/snakeInput.test.ts src/games/snake/SnakeCanvas.test.tsx src/games/fruit-ninja/FruitNinjaCanvas.test.tsx src/games/pool/PoolCanvas.test.tsx src/games/mini-golf/MiniGolfCanvas.test.tsx`
+  - full suite: `npm run test:run`
+  - lint: `npm run lint`
+  - build: `npm run build`
+- Browser validation artifacts:
+  - landing page: `output/pinch-validate-landing.png`
+  - Snake pinch-start validation: `output/pinch-validate-snake/shot-0.png`, `output/pinch-validate-snake/state-0.json`
+  - Fruit Ninja pinch-start validation: `output/pinch-validate-fruit/shot-0.png`, `output/pinch-validate-fruit/state-0.json`
+  - Pool pinch-start validation: `output/pinch-validate-pool/shot-0.png`, `output/pinch-validate-pool/state-0.json`
+  - Mini Golf pinch-start validation: `output/pinch-validate-golf/shot-0.png`, `output/pinch-validate-golf/state-0.json`
+- Remaining TODOs:
+  - run a real-webcam pass to tune the new higher sensitivity against real camera jitter, not only synthetic debug frames
+  - decide whether to keep or remove the existing retry-camera button on routes when the page is in simulated debug control mode

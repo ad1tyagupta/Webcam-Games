@@ -18,6 +18,19 @@ export function toNormalizedPoint(point: Vector2, width: number, height: number)
   }
 }
 
+export function amplifyNormalizedPoint(
+  point: Vector2,
+  gain: number | Vector2,
+  anchor: Vector2 = { x: 0.5, y: 0.5 },
+): Vector2 {
+  const resolvedGain = typeof gain === 'number' ? { x: gain, y: gain } : gain
+
+  return {
+    x: clamp(anchor.x + ((point.x - anchor.x) * resolvedGain.x), 0, 1),
+    y: clamp(anchor.y + ((point.y - anchor.y) * resolvedGain.y), 0, 1),
+  }
+}
+
 export function movePointer(
   point: Vector2,
   pressedKeys: Set<string>,

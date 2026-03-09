@@ -1,0 +1,29 @@
+{
+  "route": "/play/fruit-ninja",
+  "mode": "playing",
+  "coordinateSystem": "canvas origin at top-left, x increases right, y increases down",
+  "score": 0,
+  "misses": 0,
+  "livesRemaining": 7,
+  "fruits": [],
+  "pointer": {
+    "x": 474,
+    "y": 464
+  },
+  "slashActive": false,
+  "visibleControls": [
+    {
+      "id": "pause",
+      "label": "Pause",
+      "x": 554,
+      "y": 24,
+      "width": 142,
+      "height": 48
+    }
+  ],
+  "hoveredControl": null,
+  "tracking": {
+    "status": "ready",
+    "source": "debug"
+  }
+}

@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { GameCameraCard } from '../../components/GameCameraCard'
+import { GameStageLayout } from '../../components/GameStageLayout'
+import { GameUiCursor } from '../../components/GameUiCursor'
 import { registerActiveGameRuntime } from '../../runtime/windowBindings'
 import { useArcadeSession } from '../../session/ArcadeSession'
 import type { HandFrame, Vector2 } from '../../types/arcade'
 import { createEmptyHandFrame, pinchStateFromDistance } from '../../tracking/handMath'
-import { movePointer, pinchStateFromKeyboard, toCanvasPoint } from '../common/input'
+import { amplifyNormalizedPoint, movePointer, pinchStateFromKeyboard, toCanvasPoint } from '../common/input'
+import { useGameUiCursor } from '../common/useGameUiCursor'
 import { createPoolEngine, type PoolState } from './poolEngine'
 
 const WIDTH = 720
 const HEIGHT = 540
+const HAND_POINTER_GAIN = { x: 1.82, y: 1.78 }
 const POCKETS = [
   { x: 40, y: 40 },
   { x: WIDTH / 2, y: 32 },
@@ -105,8 +108,26 @@ function sameState(a: PoolState, b: PoolState) {
   )
 }
 
+function drawStageOverlay(canvas: HTMLCanvasElement, title: string, detail: string) {
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    return
+  }
+
+  ctx.fillStyle = 'rgba(5, 12, 16, 0.56)'
+  ctx.fillRect(0, 0, WIDTH, HEIGHT)
+  ctx.fillStyle = '#f6efe0'
+  ctx.textAlign = 'center'
+  ctx.font = '800 42px "Trebuchet MS", sans-serif'
+  ctx.fillText(title, WIDTH / 2, HEIGHT / 2 - 16)
+  ctx.font = '600 18px "Trebuchet MS", sans-serif'
+  ctx.fillText(detail, WIDTH / 2, HEIGHT / 2 + 24)
+  ctx.textAlign = 'start'
+}
+
 export function PoolCanvas() {
   const { handFrame } = useArcadeSession()
+  const stageRef = useRef<HTMLElement | null>(null)
   const handFrameRef = useRef<HandFrame>(createEmptyHandFrame('idle'))
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const pointerRef = useRef<Vector2>({ x: WIDTH * 0.7, y: HEIGHT * 0.45 })
@@ -114,12 +135,19 @@ export function PoolCanvas() {
   const animationFrameRef = useRef(0)
   const lastTimestampRef = useRef(0)
   const pressedKeysRef = useRef<Set<string>>(new Set())
+  const stageModeRef = useRef<'title' | 'playing' | 'paused'>('title')
   const engine = useMemo(() => createPoolEngine(), [])
   const [state, setState] = useState(() => engine.getState())
+  const [stageMode, setStageMode] = useState<'title' | 'playing' | 'paused'>('title')
+  const cursor = useGameUiCursor(stageRef, handFrame)
 
   useEffect(() => {
     handFrameRef.current = handFrame
   }, [handFrame])
+
+  useEffect(() => {
+    stageModeRef.current = stageMode
+  }, [stageMode])
 
   const syncState = useCallback(() => {
     const nextState = engine.getState()
@@ -130,7 +158,7 @@ export function PoolCanvas() {
     const activeFrame = handFrameRef.current
     const pointer =
       activeFrame.status === 'ready'
-        ? toCanvasPoint(activeFrame.derived.indexTip, WIDTH, HEIGHT)
+        ? toCanvasPoint(amplifyNormalizedPoint(activeFrame.derived.indexTip, HAND_POINTER_GAIN), WIDTH, HEIGHT)
         : (virtualPointerRef.current = movePointer(
             virtualPointerRef.current,
             pressedKeysRef.current,
@@ -139,20 +167,27 @@ export function PoolCanvas() {
             HEIGHT,
           ))
     pointerRef.current = pointer
-    engine.update(dtMs, {
-      directionIntent: 'none',
-      pointer,
-      swipeSpeed: 0,
-      pinchState:
-        activeFrame.status === 'ready'
-          ? pinchStateFromDistance(activeFrame.derived.pinchDistance)
-          : pinchStateFromKeyboard(pressedKeysRef.current),
-      trackingStatus: activeFrame.status,
-    })
-    syncState()
+    if (stageModeRef.current === 'playing') {
+      engine.update(dtMs, {
+        directionIntent: 'none',
+        pointer,
+        swipeSpeed: 0,
+        pinchState:
+          activeFrame.status === 'ready'
+            ? pinchStateFromDistance(activeFrame.derived.pinchDistance)
+            : pinchStateFromKeyboard(pressedKeysRef.current),
+        trackingStatus: activeFrame.status,
+      })
+      syncState()
+    }
     const canvas = canvasRef.current
     if (canvas) {
       drawScene(canvas, engine.getState(), pointerRef.current, activeFrame.status)
+      if (stageModeRef.current === 'title') {
+        drawStageOverlay(canvas, 'Ready to break', 'Pinch the start button to open the match.')
+      } else if (stageModeRef.current === 'paused') {
+        drawStageOverlay(canvas, 'Paused table', 'Resume when your next shot is lined up.')
+      }
     }
   }, [engine, syncState])
 
@@ -196,6 +231,7 @@ export function PoolCanvas() {
             x: Math.round(pointerRef.current.x),
             y: Math.round(pointerRef.current.y),
           },
+          sessionMode: stageModeRef.current,
           tracking: {
             status: handFrameRef.current.status,
             source: handFrameRef.current.source,
@@ -222,48 +258,95 @@ export function PoolCanvas() {
 
   const resetGame = () => {
     engine.reset()
+    setStageMode('title')
     syncState()
   }
 
   const targetCount = state.balls.filter((ball) => ball.kind === 'target' && !ball.pocketed).length
+  const displayState = state.mode === 'win' && stageMode === 'playing' ? 'win' : stageMode
+  const primaryLabel =
+    state.mode === 'win'
+      ? 'Play again'
+      : stageMode === 'playing'
+        ? 'Pause game'
+        : stageMode === 'paused'
+          ? 'Resume game'
+          : 'Start game'
+
+  const performPrimaryAction = () => {
+    if (state.mode === 'win') {
+      engine.reset()
+      syncState()
+      setStageMode('playing')
+      return
+    }
+
+    setStageMode((current) => (current === 'playing' ? 'paused' : 'playing'))
+  }
+
+  const infoPanel = (
+    <section className="panel game-info-card">
+      <div className="game-info-card__intro">
+        <p className="game-info-card__label">Cue controls</p>
+        <p>Amplified aiming makes tiny finger shifts swing the cue much farther across the felt.</p>
+      </div>
+      <div className="status-grid">
+        <div className="status-card">
+          <strong>Targets</strong>
+          <span>{targetCount}</span>
+        </div>
+        <div className="status-card">
+          <strong>Power</strong>
+          <span>{Math.round(state.charge * 100)}%</span>
+        </div>
+        <div className="status-card">
+          <strong>State</strong>
+          <span>{displayState}</span>
+        </div>
+      </div>
+      <div className="button-row">
+        <button
+          id="start-pool-btn"
+          className="button"
+          data-game-ui-id="pool-primary"
+          data-game-ui-target="true"
+          type="button"
+          onClick={performPrimaryAction}
+        >
+          {primaryLabel}
+        </button>
+        <button
+          id="reset-pool-btn"
+          className="button button--ghost"
+          data-game-ui-id="pool-reset"
+          data-game-ui-target="true"
+          type="button"
+          onClick={resetGame}
+        >
+          Reset rack
+        </button>
+      </div>
+      <ul className="control-list">
+        <li>Point your fingertip to aim the cue. Short hand motions now cover more of the table.</li>
+        <li>Pinch and hold to build power, then release to shoot once the match has started.</li>
+        <li>Pinch on the visible buttons to start, pause, resume, or rerack.</li>
+      </ul>
+    </section>
+  )
 
   return (
-    <section className="game-layout">
-      <div className="panel panel--canvas">
-        <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="game-canvas" />
-      </div>
-      <GameCameraCard debugButtonId="debug-pool-btn" />
-      <section className="panel game-info-card">
-        <span className="eyebrow">Pool</span>
-        <h1>Pocket Pulse</h1>
-        <div className="status-grid">
-          <div className="status-card">
-            <strong>Targets</strong>
-            <span>{targetCount}</span>
-          </div>
-          <div className="status-card">
-            <strong>Power</strong>
-            <span>{Math.round(state.charge * 100)}%</span>
-          </div>
-          <div className="status-card">
-            <strong>State</strong>
-            <span>{state.mode}</span>
-          </div>
-        </div>
-        <div className="button-row">
-          <button className="button button--ghost" type="button" onClick={resetGame}>
-            Reset rack
-          </button>
-        </div>
-        <ul className="control-list">
-          <li>Point your fingertip to aim the cue.</li>
-          <li>Pinch and hold to build power, then release to shoot.</li>
-          <li>Keyboard fallback: move aim with arrows or WASD, hold Space to charge.</li>
-        </ul>
-        <Link className="button button--ghost" to="/">
-          Back to games
-        </Link>
-      </section>
-    </section>
+    <GameStageLayout
+      accent="#3dd6c6"
+      cameraCard={<GameCameraCard debugButtonId="debug-pool-btn" />}
+      eyebrow="Pool"
+      gameId="pool"
+      infoPanel={infoPanel}
+      overlay={<GameUiCursor cursor={cursor} />}
+      stageRef={stageRef}
+      subtitle="Sharper cue alignment and finger-first match controls."
+      title="Pocket Pulse"
+    >
+      <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="game-canvas" aria-label="Pool table" />
+    </GameStageLayout>
   )
 }

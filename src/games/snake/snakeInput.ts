@@ -4,11 +4,13 @@ import { directionFromVector, pinchStateFromDistance } from '../../tracking/hand
 interface SnakeGestureInterpreterOptions {
   confirmationFrames?: number
   cooldownMs?: number
+  deadZone?: number
 }
 
 export function createSnakeGestureInterpreter(options: SnakeGestureInterpreterOptions = {}) {
   const confirmationFrames = options.confirmationFrames ?? 2
   const cooldownMs = options.cooldownMs ?? 150
+  const deadZone = options.deadZone ?? 0.18
   let candidate: DirectionIntent = 'none'
   let streak = 0
   let lastCommitTimestamp = -Infinity
@@ -28,7 +30,7 @@ export function createSnakeGestureInterpreter(options: SnakeGestureInterpreterOp
         return 'none'
       }
 
-      const bucket = directionFromVector(handFrame.derived.pointerVector)
+      const bucket = directionFromVector(handFrame.derived.pointerVector, deadZone)
       if (bucket === 'none') {
         candidate = 'none'
         streak = 0

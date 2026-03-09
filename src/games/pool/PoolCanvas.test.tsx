@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createEmptyHandFrame } from '../../tracking/handMath'
-import { MiniGolfCanvas } from './MiniGolfCanvas'
+import { PoolCanvas } from './PoolCanvas'
 
 const mockUseArcadeSession = vi.fn()
 
@@ -22,7 +22,7 @@ function makeSession() {
   }
 }
 
-describe('MiniGolfCanvas', () => {
+describe('PoolCanvas', () => {
   const originalRequestAnimationFrame = window.requestAnimationFrame
   const originalCancelAnimationFrame = window.cancelAnimationFrame
   const originalGetContext = HTMLCanvasElement.prototype.getContext
@@ -32,36 +32,22 @@ describe('MiniGolfCanvas', () => {
     window.requestAnimationFrame = vi.fn(() => 1)
     window.cancelAnimationFrame = vi.fn()
     const contextStub = {
-      clearRect: vi.fn(),
-      createLinearGradient: vi.fn(() => ({
-        addColorStop: vi.fn(),
-      })),
-      createRadialGradient: vi.fn(() => ({
-        addColorStop: vi.fn(),
-      })),
       fillRect: vi.fn(),
       beginPath: vi.fn(),
       arc: vi.fn(),
       fill: vi.fn(),
-      roundRect: vi.fn(),
-      fillText: vi.fn(),
+      stroke: vi.fn(),
       moveTo: vi.fn(),
       lineTo: vi.fn(),
-      closePath: vi.fn(),
-      stroke: vi.fn(),
-      strokeRect: vi.fn(),
-      save: vi.fn(),
-      restore: vi.fn(),
-      translate: vi.fn(),
-      scale: vi.fn(),
-      ellipse: vi.fn(),
+      roundRect: vi.fn(),
+      fillText: vi.fn(),
+      clearRect: vi.fn(),
       set fillStyle(_value: string) {},
       set strokeStyle(_value: string) {},
       set lineWidth(_value: number) {},
+      set lineCap(_value: CanvasLineCap) {},
       set font(_value: string) {},
       set textAlign(_value: CanvasTextAlign) {},
-      set lineCap(_value: CanvasLineCap) {},
-      set globalAlpha(_value: number) {},
     }
     Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
       configurable: true,
@@ -79,15 +65,14 @@ describe('MiniGolfCanvas', () => {
     window.__arcadeActiveGameRuntime = null
   })
 
-  it('renders the mini golf scene shell and registers the active runtime', () => {
+  it('renders a visible start action inside the shared pool stage', () => {
     render(
       <MemoryRouter>
-        <MiniGolfCanvas />
+        <PoolCanvas />
       </MemoryRouter>,
     )
 
-    expect(screen.getByRole('heading', { name: 'Putt Parade' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Mini golf course')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Pocket Pulse' })).toBeInTheDocument()
     expect(screen.getByTestId('game-stage-rail')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /start game/i })).toBeInTheDocument()
     expect(window.__arcadeActiveGameRuntime).toBeTruthy()

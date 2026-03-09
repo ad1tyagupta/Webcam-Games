@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { GameCameraCard } from '../../components/GameCameraCard'
+import { GameStageLayout } from '../../components/GameStageLayout'
+import { GameUiCursor } from '../../components/GameUiCursor'
 import { registerActiveGameRuntime } from '../../runtime/windowBindings'
 import { useArcadeSession } from '../../session/ArcadeSession'
 import type { DirectionIntent, HandFrame } from '../../types/arcade'
 import { createEmptyHandFrame } from '../../tracking/handMath'
+import { useGameUiCursor } from '../common/useGameUiCursor'
 import { createSnakeEngine, type SnakeState } from './snakeEngine'
 import { createSnakeGameInput, createSnakeGestureInterpreter } from './snakeInput'
 
@@ -372,6 +374,7 @@ function statesEqual(a: SnakeState, b: SnakeState) {
 
 export function SnakeCanvas() {
   const { enableDebugTracker, handFrame, trackerMode } = useArcadeSession()
+  const stageRef = useRef<HTMLElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const handFrameRef = useRef<HandFrame>(createEmptyHandFrame('idle'))
   const keyboardDirectionRef = useRef<DirectionIntent>('none')
@@ -379,7 +382,10 @@ export function SnakeCanvas() {
   const animationFrameRef = useRef(0)
   const lastTimestampRef = useRef(0)
   const engine = useMemo(() => createSnakeEngine(), [])
-  const gestureInterpreter = useMemo(() => createSnakeGestureInterpreter(), [])
+  const gestureInterpreter = useMemo(
+    () => createSnakeGestureInterpreter({ confirmationFrames: 1, cooldownMs: 95, deadZone: 0.11 }),
+    [],
+  )
   const shouldSimulateHand = useMemo(() => {
     if (!import.meta.env.DEV) {
       return false
@@ -387,6 +393,7 @@ export function SnakeCanvas() {
     return new URLSearchParams(window.location.search).get('simulateHand') === '1'
   }, [])
   const [state, setState] = useState(() => engine.getState())
+  const cursor = useGameUiCursor(stageRef, handFrame)
 
   useEffect(() => {
     handFrameRef.current = handFrame
@@ -534,57 +541,87 @@ export function SnakeCanvas() {
     syncState()
   }
 
-  return (
-    <section className="game-layout">
-      <div className="panel panel--canvas">
-        <canvas
-          ref={canvasRef}
-          id="snake-canvas"
-          width={CANVAS_WIDTH}
-          height={CANVAS_HEIGHT}
-          aria-label="Snake terrarium scene"
-          className="game-canvas game-canvas--square"
-        />
+  const infoPanel = (
+    <section className="panel game-info-card">
+      <div className="game-info-card__intro">
+        <p className="game-info-card__label">Terrarium controls</p>
+        <p>Faster gesture pickup keeps the snake responsive even when your fingers only move a little.</p>
       </div>
-      <GameCameraCard debugButtonId="debug-snake-btn" />
-      <section className="panel game-info-card">
-        <span className="eyebrow">Snake</span>
-        <h1>Snake Signal</h1>
-        <div className="status-grid">
-          <div className="status-card">
-            <strong>Score</strong>
-            <span>{state.score}</span>
-          </div>
-          <div className="status-card">
-            <strong>State</strong>
-            <span>{state.mode}</span>
-          </div>
-          <div className="status-card">
-            <strong>Tracking</strong>
-            <span>{handFrame.status}</span>
-          </div>
+      <div className="status-grid">
+        <div className="status-card">
+          <strong>Score</strong>
+          <span>{state.score}</span>
         </div>
-        <div className="button-row">
-          <button id="start-snake-btn" className="button" type="button" onClick={startGame}>
-            {state.mode === 'playing' ? 'Playing' : state.mode === 'gameover' ? 'Play again' : 'Start game'}
-          </button>
-          <button className="button button--ghost" type="button" onClick={togglePause}>
-            {state.mode === 'paused' ? 'Resume' : 'Pause'}
-          </button>
-          <button className="button button--ghost" type="button" onClick={resetGame}>
-            Reset
-          </button>
+        <div className="status-card">
+          <strong>State</strong>
+          <span>{state.mode}</span>
         </div>
-        <ul className="control-list">
-          <li>Turn your fingers up, down, left, or right to steer.</li>
-          <li>Movement is mirrored to match what you see in the camera feed.</li>
-          <li>Keyboard fallback: arrows or WASD, Enter to start, R to reset.</li>
-        </ul>
-        <Link className="button button--ghost" to="/">
-          Back to games
-        </Link>
-      </section>
+        <div className="status-card">
+          <strong>Tracking</strong>
+          <span>{handFrame.status}</span>
+        </div>
+      </div>
+      <div className="button-row">
+        <button
+          id="start-snake-btn"
+          className="button"
+          data-game-ui-id="snake-start"
+          data-game-ui-target="true"
+          type="button"
+          onClick={startGame}
+        >
+          {state.mode === 'playing' ? 'Playing' : state.mode === 'gameover' ? 'Play again' : 'Start game'}
+        </button>
+        <button
+          id="pause-snake-btn"
+          className="button button--ghost"
+          data-game-ui-id="snake-pause"
+          data-game-ui-target="true"
+          type="button"
+          onClick={togglePause}
+        >
+          {state.mode === 'paused' ? 'Resume' : 'Pause'}
+        </button>
+        <button
+          id="reset-snake-btn"
+          className="button button--ghost"
+          data-game-ui-id="snake-reset"
+          data-game-ui-target="true"
+          type="button"
+          onClick={resetGame}
+        >
+          Reset
+        </button>
+      </div>
+      <ul className="control-list">
+        <li>Tip the fingers into the next direction. Small turns now snap the steering faster.</li>
+        <li>Pinch on the visible buttons to start, pause, or reset without leaving the game screen.</li>
+        <li>Keyboard fallback: arrows or WASD, Enter to start, R to reset.</li>
+      </ul>
     </section>
+  )
+
+  return (
+    <GameStageLayout
+      accent="#c6ff5d"
+      cameraCard={<GameCameraCard debugButtonId="debug-snake-btn" />}
+      eyebrow="Snake"
+      gameId="snake"
+      infoPanel={infoPanel}
+      overlay={<GameUiCursor cursor={cursor} />}
+      stageRef={stageRef}
+      subtitle="Sporty-modern terrarium steering with amplified gesture response."
+      title="Snake Signal"
+    >
+      <canvas
+        ref={canvasRef}
+        id="snake-canvas"
+        width={CANVAS_WIDTH}
+        height={CANVAS_HEIGHT}
+        aria-label="Snake terrarium scene"
+        className="game-canvas game-canvas--square"
+      />
+    </GameStageLayout>
   )
 }
 

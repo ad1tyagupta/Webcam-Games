@@ -17,10 +17,18 @@ export function GameCard({ game }: GameCardProps) {
       <div className="game-tile__image-wrap">
         <img className="game-tile__image" src={game.imagePath} alt={`${game.title} preview`} />
       </div>
+      <div className="game-tile__meta">
+        <span className="pill">{game.difficulty}</span>
+        <span className="game-tile__status game-tile__status--playable">Playable</span>
+      </div>
       <div className="game-tile__footer">
-        <h2>{game.title}</h2>
-        <span className={`game-tile__status game-tile__status--${game.status}`}>
-          {game.status === 'playable' ? 'Play now' : 'Coming soon'}
+        <div className="game-tile__copy">
+          <h2>{game.title}</h2>
+          <p>{game.description}</p>
+          <span className="game-tile__summary">{game.controlSummary}</span>
+        </div>
+        <span className={`game-tile__cta game-tile__cta--${game.status}`}>
+          {game.status === 'playable' ? 'Enter arena' : 'Coming soon'}
         </span>
       </div>
     </Link>
