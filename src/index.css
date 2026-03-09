@@ -685,6 +685,27 @@ kbd {
   margin-top: 0.85rem;
 }
 
+.game-camera-card__copy {
+  width: 100%;
+  min-height: 3.4rem;
+}
+
+.game-camera-card__actions {
+  display: grid;
+  width: 100%;
+  gap: 0.7rem;
+}
+
+.game-camera-card__actions .button {
+  width: 100%;
+}
+
+.game-camera-card__action-slot {
+  display: block;
+  width: 100%;
+  min-height: 2.85rem;
+}
+
 .game-camera-card__footer p,
 .game-info-card p {
   margin: 0;

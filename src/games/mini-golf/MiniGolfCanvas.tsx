@@ -7,109 +7,361 @@ import type { HandFrame, Vector2 } from '../../types/arcade'
 import { createEmptyHandFrame, pinchStateFromDistance } from '../../tracking/handMath'
 import { movePointer, pinchStateFromKeyboard, toCanvasPoint } from '../common/input'
 import { createMiniGolfEngine, type MiniGolfState } from './miniGolfEngine'
+import { createMiniGolfGestureController } from './miniGolfGesture'
 
 const WIDTH = 720
 const HEIGHT = 540
+const START_RADIUS = 88
+
+function drawRoundedRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  ctx.beginPath()
+  ctx.roundRect(x, y, width, height, radius)
+}
+
+function traceCourse(ctx: CanvasRenderingContext2D) {
+  ctx.beginPath()
+  ctx.moveTo(104, 420)
+  ctx.quadraticCurveTo(250, 338, 360, 350)
+  ctx.quadraticCurveTo(500, 364, 606, 144)
+}
+
+function drawTerrain(ctx: CanvasRenderingContext2D) {
+  const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT)
+  sky.addColorStop(0, '#bfe6ff')
+  sky.addColorStop(0.42, '#dff3ff')
+  sky.addColorStop(0.42, '#6aa95e')
+  sky.addColorStop(1, '#2f6f34')
+  ctx.fillStyle = sky
+  ctx.fillRect(0, 0, WIDTH, HEIGHT)
+
+  const sunGlow = ctx.createRadialGradient(580, 90, 20, 580, 90, 220)
+  sunGlow.addColorStop(0, 'rgba(255, 244, 188, 0.95)')
+  sunGlow.addColorStop(1, 'rgba(255, 244, 188, 0)')
+  ctx.fillStyle = sunGlow
+  ctx.fillRect(0, 0, WIDTH, HEIGHT)
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'
+  ctx.beginPath()
+  ctx.ellipse(162, 84, 92, 28, -0.08, 0, Math.PI * 2)
+  ctx.ellipse(248, 112, 74, 22, 0.05, 0, Math.PI * 2)
+  ctx.ellipse(438, 74, 88, 24, 0.02, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.fillStyle = 'rgba(18, 62, 23, 0.22)'
+  ctx.beginPath()
+  ctx.ellipse(352, 366, 290, 106, -0.18, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.save()
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.shadowColor = 'rgba(13, 45, 19, 0.32)'
+  ctx.shadowBlur = 30
+  ctx.shadowOffsetY = 16
+  ctx.strokeStyle = '#25572a'
+  ctx.lineWidth = 156
+  traceCourse(ctx)
+  ctx.stroke()
+  ctx.restore()
+
+  ctx.save()
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.strokeStyle = '#317137'
+  ctx.lineWidth = 136
+  traceCourse(ctx)
+  ctx.stroke()
+  ctx.strokeStyle = '#4e8e44'
+  ctx.lineWidth = 112
+  traceCourse(ctx)
+  ctx.stroke()
+  ctx.strokeStyle = '#6cab57'
+  ctx.lineWidth = 88
+  traceCourse(ctx)
+  ctx.stroke()
+  ctx.strokeStyle = 'rgba(188, 225, 135, 0.72)'
+  ctx.lineWidth = 56
+  traceCourse(ctx)
+  ctx.stroke()
+  ctx.restore()
+
+  ctx.save()
+  ctx.setLineDash([16, 18])
+  ctx.lineCap = 'round'
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)'
+  ctx.lineWidth = 72
+  traceCourse(ctx)
+  ctx.stroke()
+  ctx.restore()
+
+  const bunker = ctx.createLinearGradient(0, 300, 0, 380)
+  bunker.addColorStop(0, '#f7e8bf')
+  bunker.addColorStop(1, '#d7b36f')
+  ctx.fillStyle = bunker
+  ctx.beginPath()
+  ctx.ellipse(470, 312, 88, 42, -0.28, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.beginPath()
+  ctx.ellipse(248, 218, 58, 26, -0.3, 0, Math.PI * 2)
+  ctx.fill()
+
+  const vignette = ctx.createRadialGradient(WIDTH / 2, HEIGHT / 2, 180, WIDTH / 2, HEIGHT / 2, 460)
+  vignette.addColorStop(0, 'rgba(0, 0, 0, 0)')
+  vignette.addColorStop(1, 'rgba(5, 14, 8, 0.28)')
+  ctx.fillStyle = vignette
+  ctx.fillRect(0, 0, WIDTH, HEIGHT)
+
+  drawRoundedRect(ctx, 14, 14, WIDTH - 28, HEIGHT - 28, 32)
+  ctx.lineWidth = 12
+  ctx.strokeStyle = 'rgba(94, 61, 38, 0.72)'
+  ctx.stroke()
+  drawRoundedRect(ctx, 22, 22, WIDTH - 44, HEIGHT - 44, 28)
+  ctx.lineWidth = 2
+  ctx.strokeStyle = 'rgba(255, 244, 216, 0.32)'
+  ctx.stroke()
+}
+
+function drawBarrier(
+  ctx: CanvasRenderingContext2D,
+  wall: { x: number; y: number; width: number; height: number },
+) {
+  ctx.save()
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.25)'
+  ctx.shadowBlur = 14
+  ctx.shadowOffsetY = 10
+  drawRoundedRect(ctx, wall.x, wall.y + 10, wall.width, wall.height, 12)
+  ctx.fillStyle = '#4e3d31'
+  ctx.fill()
+  ctx.restore()
+
+  drawRoundedRect(ctx, wall.x, wall.y, wall.width, wall.height, 12)
+  const face = ctx.createLinearGradient(wall.x, wall.y, wall.x, wall.y + wall.height)
+  face.addColorStop(0, '#b49a82')
+  face.addColorStop(0.28, '#8b715d')
+  face.addColorStop(1, '#584538')
+  ctx.fillStyle = face
+  ctx.fill()
+
+  drawRoundedRect(ctx, wall.x + 5, wall.y + 4, wall.width - 10, Math.max(8, wall.height * 0.18), 8)
+  ctx.fillStyle = 'rgba(255, 244, 228, 0.24)'
+  ctx.fill()
+
+  drawRoundedRect(ctx, wall.x + 8, wall.y + wall.height * 0.45, wall.width - 16, wall.height * 0.18, 6)
+  ctx.fillStyle = 'rgba(48, 31, 23, 0.18)'
+  ctx.fill()
+}
+
+function drawHole(ctx: CanvasRenderingContext2D, hole: Vector2) {
+  ctx.fillStyle = 'rgba(14, 25, 23, 0.42)'
+  ctx.beginPath()
+  ctx.ellipse(hole.x + 3, hole.y + 10, 36, 14, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  const cup = ctx.createRadialGradient(hole.x, hole.y - 4, 4, hole.x, hole.y, 30)
+  cup.addColorStop(0, '#324243')
+  cup.addColorStop(0.4, '#0f1519')
+  cup.addColorStop(1, '#020406')
+  ctx.beginPath()
+  ctx.arc(hole.x, hole.y, 24, 0, Math.PI * 2)
+  ctx.fillStyle = cup
+  ctx.fill()
+  ctx.lineWidth = 4
+  ctx.strokeStyle = 'rgba(255, 248, 228, 0.36)'
+  ctx.stroke()
+
+  const pole = ctx.createLinearGradient(hole.x, hole.y - 84, hole.x, hole.y - 18)
+  pole.addColorStop(0, '#f6f2de')
+  pole.addColorStop(1, '#b8af88')
+  ctx.fillStyle = pole
+  ctx.fillRect(hole.x - 2, hole.y - 82, 4, 66)
+
+  ctx.beginPath()
+  ctx.moveTo(hole.x + 2, hole.y - 80)
+  ctx.lineTo(hole.x + 48, hole.y - 66)
+  ctx.lineTo(hole.x + 6, hole.y - 48)
+  ctx.lineTo(hole.x + 18, hole.y - 64)
+  ctx.closePath()
+  const flag = ctx.createLinearGradient(hole.x, hole.y - 76, hole.x + 44, hole.y - 56)
+  flag.addColorStop(0, '#ff8e74')
+  flag.addColorStop(1, '#d7423d')
+  ctx.fillStyle = flag
+  ctx.fill()
+}
+
+function drawBall(ctx: CanvasRenderingContext2D, ball: Vector2) {
+  ctx.fillStyle = 'rgba(20, 28, 21, 0.34)'
+  ctx.beginPath()
+  ctx.ellipse(ball.x + 5, ball.y + 14, 22, 9, -0.12, 0, Math.PI * 2)
+  ctx.fill()
+
+  const sphere = ctx.createRadialGradient(ball.x - 7, ball.y - 9, 2, ball.x, ball.y, 24)
+  sphere.addColorStop(0, '#ffffff')
+  sphere.addColorStop(0.46, '#f7f7f3')
+  sphere.addColorStop(0.8, '#d7dbdc')
+  sphere.addColorStop(1, '#b3bbbe')
+  ctx.beginPath()
+  ctx.arc(ball.x, ball.y, 16, 0, Math.PI * 2)
+  ctx.fillStyle = sphere
+  ctx.fill()
+  ctx.lineWidth = 1.5
+  ctx.strokeStyle = 'rgba(137, 148, 150, 0.65)'
+  ctx.stroke()
+
+  ctx.fillStyle = 'rgba(175, 182, 185, 0.26)'
+  for (const [dx, dy] of [
+    [-5, -2],
+    [2, -5],
+    [6, 1],
+    [-2, 6],
+    [4, 7],
+  ]) {
+    ctx.beginPath()
+    ctx.arc(ball.x + dx, ball.y + dy, 1.3, 0, Math.PI * 2)
+    ctx.fill()
+  }
+}
+
+function drawAimPreview(ctx: CanvasRenderingContext2D, state: MiniGolfState, pointer: Vector2) {
+  const pointerDistance = Math.hypot(pointer.x - state.ball.x, pointer.y - state.ball.y)
+  const canStart = pointerDistance <= START_RADIUS
+
+  if (state.mode === 'aim') {
+    ctx.save()
+    ctx.setLineDash([8, 10])
+    ctx.lineWidth = 3
+    ctx.strokeStyle = canStart ? 'rgba(255, 241, 184, 0.9)' : 'rgba(255, 255, 255, 0.32)'
+    ctx.beginPath()
+    ctx.arc(state.ball.x, state.ball.y, START_RADIUS, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.restore()
+
+    const tether = ctx.createLinearGradient(state.ball.x, state.ball.y, pointer.x, pointer.y)
+    tether.addColorStop(0, 'rgba(255, 241, 184, 0.16)')
+    tether.addColorStop(1, 'rgba(255, 241, 184, 0.7)')
+    ctx.strokeStyle = tether
+    ctx.lineWidth = canStart ? 4 : 2
+    ctx.beginPath()
+    ctx.moveTo(state.ball.x, state.ball.y)
+    ctx.lineTo(pointer.x, pointer.y)
+    ctx.stroke()
+
+    ctx.beginPath()
+    ctx.arc(pointer.x, pointer.y, 10, 0, Math.PI * 2)
+    ctx.fillStyle = 'rgba(250, 206, 92, 0.92)'
+    ctx.fill()
+    ctx.beginPath()
+    ctx.arc(pointer.x, pointer.y, 18, 0, Math.PI * 2)
+    ctx.lineWidth = 2
+    ctx.strokeStyle = 'rgba(255, 245, 216, 0.48)'
+    ctx.stroke()
+    return
+  }
+
+  const dragPoint = state.dragPoint ?? pointer
+  const dx = dragPoint.x - state.ball.x
+  const dy = dragPoint.y - state.ball.y
+  const distance = Math.max(1, Math.hypot(dx, dy))
+  const direction = { x: -dx / distance, y: -dy / distance }
+
+  const tether = ctx.createLinearGradient(state.ball.x, state.ball.y, dragPoint.x, dragPoint.y)
+  tether.addColorStop(0, 'rgba(248, 215, 160, 0.25)')
+  tether.addColorStop(1, 'rgba(170, 121, 65, 0.95)')
+  ctx.strokeStyle = tether
+  ctx.lineWidth = 12
+  ctx.lineCap = 'round'
+  ctx.beginPath()
+  ctx.moveTo(state.ball.x, state.ball.y)
+  ctx.lineTo(dragPoint.x, dragPoint.y)
+  ctx.stroke()
+
+  ctx.beginPath()
+  ctx.arc(dragPoint.x, dragPoint.y, 11, 0, Math.PI * 2)
+  ctx.fillStyle = '#8f5f37'
+  ctx.fill()
+  ctx.beginPath()
+  ctx.arc(dragPoint.x, dragPoint.y, 5, 0, Math.PI * 2)
+  ctx.fillStyle = '#d8d8d8'
+  ctx.fill()
+
+  for (let step = 1; step <= 5; step += 1) {
+    const progress = step / 5
+    const guideX = state.ball.x + direction.x * (40 + progress * 145)
+    const guideY = state.ball.y + direction.y * (40 + progress * 145)
+    ctx.beginPath()
+    ctx.arc(guideX, guideY, 8 - step, 0, Math.PI * 2)
+    ctx.fillStyle = `rgba(255, 247, 214, ${0.48 - progress * 0.18})`
+    ctx.fill()
+  }
+}
+
+function drawHud(ctx: CanvasRenderingContext2D, state: MiniGolfState, trackingStatus: HandFrame['status']) {
+  const leftPanel = ctx.createLinearGradient(24, 18, 24, 112)
+  leftPanel.addColorStop(0, 'rgba(22, 30, 34, 0.9)')
+  leftPanel.addColorStop(1, 'rgba(12, 18, 20, 0.78)')
+  ctx.fillStyle = leftPanel
+  drawRoundedRect(ctx, 22, 18, 222, 94, 24)
+  ctx.fill()
+
+  ctx.fillStyle = '#f6f0dd'
+  ctx.font = '700 18px "Trebuchet MS", sans-serif'
+  ctx.fillText(`Strokes ${state.strokes}`, 42, 50)
+  ctx.fillText(`Putt power ${Math.round(state.charge * 100)}%`, 42, 79)
+  ctx.fillStyle = 'rgba(246, 240, 221, 0.72)'
+  ctx.font = '600 14px "Trebuchet MS", sans-serif'
+  ctx.fillText(state.mode === 'aim' ? 'Pinch near the ball to start a putt.' : 'Pull back while pinched, then release.', 42, 102)
+
+  const rightPanel = ctx.createLinearGradient(WIDTH - 226, 18, WIDTH - 226, 112)
+  rightPanel.addColorStop(0, 'rgba(22, 30, 34, 0.88)')
+  rightPanel.addColorStop(1, 'rgba(12, 18, 20, 0.76)')
+  ctx.fillStyle = rightPanel
+  drawRoundedRect(ctx, WIDTH - 224, 18, 202, 94, 24)
+  ctx.fill()
+
+  ctx.fillStyle = '#f6f0dd'
+  ctx.font = '700 18px "Trebuchet MS", sans-serif'
+  ctx.fillText(`State ${state.mode}`, WIDTH - 200, 50)
+  ctx.fillText(`Tracking ${trackingStatus}`, WIDTH - 200, 79)
+}
 
 function drawScene(
   canvas: HTMLCanvasElement,
   state: MiniGolfState,
-  walls: Array<{ x: number; y: number; width: number; height: number }>,
   pointer: Vector2,
   trackingStatus: HandFrame['status'],
+  walls: ReturnType<ReturnType<typeof createMiniGolfEngine>['getWalls']>,
 ) {
   const ctx = canvas.getContext('2d')
   if (!ctx) {
     return
   }
 
-  const bg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT)
-  bg.addColorStop(0, '#bff09d')
-  bg.addColorStop(1, '#54bee7')
-  ctx.fillStyle = bg
-  ctx.fillRect(0, 0, WIDTH, HEIGHT)
-
-  ctx.strokeStyle = '#fff4dc'
-  ctx.lineWidth = 26
-  ctx.lineCap = 'round'
-  ctx.beginPath()
-  ctx.moveTo(92, 420)
-  ctx.quadraticCurveTo(250, 332, 360, 350)
-  ctx.quadraticCurveTo(500, 370, 600, 140)
-  ctx.stroke()
-
-  ctx.strokeStyle = '#68d76d'
-  ctx.lineWidth = 18
-  ctx.beginPath()
-  ctx.moveTo(92, 420)
-  ctx.quadraticCurveTo(250, 332, 360, 350)
-  ctx.quadraticCurveTo(500, 370, 600, 140)
-  ctx.stroke()
-
-  for (const wall of walls) {
-    ctx.fillStyle = '#184550'
-    ctx.fillRect(wall.x, wall.y, wall.width, wall.height)
-  }
-
-  ctx.fillStyle = '#143850'
-  ctx.beginPath()
-  ctx.arc(state.hole.x, state.hole.y, 24, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.fillStyle = '#ff697b'
-  ctx.fillRect(state.hole.x - 2, state.hole.y - 64, 5, 64)
-  ctx.beginPath()
-  ctx.moveTo(state.hole.x + 3, state.hole.y - 64)
-  ctx.lineTo(state.hole.x + 42, state.hole.y - 50)
-  ctx.lineTo(state.hole.x + 3, state.hole.y - 34)
-  ctx.closePath()
-  ctx.fill()
-
-  ctx.fillStyle = '#fff9ee'
-  ctx.beginPath()
-  ctx.arc(state.ball.x, state.ball.y, 16, 0, Math.PI * 2)
-  ctx.fill()
-
-  if (state.mode !== 'rolling' && state.mode !== 'win') {
-    ctx.strokeStyle = '#f1d2ad'
-    ctx.lineWidth = 8
-    ctx.lineCap = 'round'
-    ctx.beginPath()
-    ctx.moveTo(state.ball.x, state.ball.y)
-    ctx.lineTo(pointer.x, pointer.y)
-    ctx.stroke()
-  }
-
-  ctx.fillStyle = '#32e875'
-  ctx.beginPath()
-  ctx.arc(pointer.x, pointer.y, 9, 0, Math.PI * 2)
-  ctx.fill()
-
-  ctx.fillStyle = 'rgba(16, 29, 55, 0.82)'
-  ctx.beginPath()
-  ctx.roundRect(18, 18, 206, 84, 24)
-  ctx.fill()
-  ctx.fillStyle = '#fff9ee'
-  ctx.font = '700 18px "Trebuchet MS", sans-serif'
-  ctx.fillText(`Strokes ${state.strokes}`, 40, 50)
-  ctx.fillText(`Power ${Math.round(state.charge * 100)}%`, 40, 80)
-
-  ctx.beginPath()
-  ctx.roundRect(WIDTH - 214, 18, 196, 84, 24)
-  ctx.fillStyle = 'rgba(16, 29, 55, 0.82)'
-  ctx.fill()
-  ctx.fillStyle = '#fff9ee'
-  ctx.fillText(`Mode ${state.mode}`, WIDTH - 192, 50)
-  ctx.fillText(`Tracking ${trackingStatus}`, WIDTH - 192, 80)
+  ctx.clearRect(0, 0, WIDTH, HEIGHT)
+  drawTerrain(ctx)
+  walls.forEach((wall) => drawBarrier(ctx, wall))
+  drawHole(ctx, state.hole)
+  drawAimPreview(ctx, state, pointer)
+  drawBall(ctx, state.ball)
+  drawHud(ctx, state, trackingStatus)
 
   if (state.mode === 'win') {
-    ctx.fillStyle = 'rgba(16, 29, 55, 0.58)'
+    ctx.fillStyle = 'rgba(8, 12, 10, 0.46)'
     ctx.fillRect(0, 0, WIDTH, HEIGHT)
-    ctx.fillStyle = '#fff9ee'
+    drawRoundedRect(ctx, WIDTH / 2 - 170, HEIGHT / 2 - 70, 340, 136, 30)
+    ctx.fillStyle = 'rgba(20, 26, 24, 0.88)'
+    ctx.fill()
+    ctx.fillStyle = '#fff7df'
     ctx.textAlign = 'center'
-    ctx.font = '800 44px "Trebuchet MS", sans-serif'
-    ctx.fillText('Putt made', WIDTH / 2, HEIGHT / 2 - 10)
+    ctx.font = '800 42px "Trebuchet MS", sans-serif'
+    ctx.fillText('Putt sunk', WIDTH / 2, HEIGHT / 2 - 8)
     ctx.font = '600 20px "Trebuchet MS", sans-serif'
-    ctx.fillText(`Finished in ${state.strokes} stroke${state.strokes === 1 ? '' : 's'}.`, WIDTH / 2, HEIGHT / 2 + 26)
+    ctx.fillText(`Finished in ${state.strokes} stroke${state.strokes === 1 ? '' : 's'}.`, WIDTH / 2, HEIGHT / 2 + 28)
     ctx.textAlign = 'start'
   }
 }
@@ -121,22 +373,25 @@ function sameState(a: MiniGolfState, b: MiniGolfState) {
     a.charge === b.charge &&
     a.trackingStatus === b.trackingStatus &&
     Math.round(a.ball.x) === Math.round(b.ball.x) &&
-    Math.round(a.ball.y) === Math.round(b.ball.y)
+    Math.round(a.ball.y) === Math.round(b.ball.y) &&
+    Math.round((a.dragPoint?.x ?? -1) * 10) === Math.round((b.dragPoint?.x ?? -1) * 10) &&
+    Math.round((a.dragPoint?.y ?? -1) * 10) === Math.round((b.dragPoint?.y ?? -1) * 10)
   )
 }
 
 export function MiniGolfCanvas() {
   const { handFrame } = useArcadeSession()
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const handFrameRef = useRef<HandFrame>(createEmptyHandFrame('idle'))
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const pointerRef = useRef<Vector2>({ x: 220, y: 360 })
   const virtualPointerRef = useRef<Vector2>({ x: 220, y: 360 })
-  const pressedKeysRef = useRef<Set<string>>(new Set())
   const animationFrameRef = useRef(0)
   const lastTimestampRef = useRef(0)
+  const pressedKeysRef = useRef<Set<string>>(new Set())
   const engine = useMemo(() => createMiniGolfEngine(), [])
+  const gestureController = useMemo(() => createMiniGolfGestureController({ startRadius: START_RADIUS }), [])
+  const walls = useMemo(() => engine.getWalls(), [engine])
   const [state, setState] = useState(() => engine.getState())
-  const walls = engine.getWalls()
 
   useEffect(() => {
     handFrameRef.current = handFrame
@@ -144,57 +399,93 @@ export function MiniGolfCanvas() {
 
   const syncState = useCallback(() => {
     const nextState = engine.getState()
-    setState((current) => (sameState(current, nextState) ? current : { ...nextState, ball: { ...nextState.ball }, velocity: { ...nextState.velocity } }))
+    setState((current) =>
+      sameState(current, nextState)
+        ? current
+        : {
+            ...nextState,
+            ball: { ...nextState.ball },
+            velocity: { ...nextState.velocity },
+            dragPoint: nextState.dragPoint ? { ...nextState.dragPoint } : null,
+          },
+    )
   }, [engine])
+
+  const resetGame = useCallback(() => {
+    engine.reset()
+    gestureController.reset()
+    pointerRef.current = { x: 220, y: 360 }
+    virtualPointerRef.current = { x: 220, y: 360 }
+    syncState()
+  }, [engine, gestureController, syncState])
 
   const stepSimulation = useCallback((dtMs: number) => {
     const activeFrame = handFrameRef.current
-    const pointer =
-      activeFrame.status === 'ready'
-        ? toCanvasPoint(activeFrame.derived.indexTip, WIDTH, HEIGHT)
-        : (virtualPointerRef.current = movePointer(
-            virtualPointerRef.current,
-            pressedKeysRef.current,
-            dtMs,
-            WIDTH,
-            HEIGHT,
-          ))
+    const usingTrackedHand = activeFrame.status === 'ready'
+    const rawPinchState = usingTrackedHand
+      ? pinchStateFromDistance(activeFrame.derived.pinchDistance)
+      : pinchStateFromKeyboard(pressedKeysRef.current)
+    const pointer = usingTrackedHand
+      ? toCanvasPoint(
+          rawPinchState === 'pinched' ? activeFrame.derived.pinchCenter : activeFrame.derived.indexTip,
+          WIDTH,
+          HEIGHT,
+        )
+      : (virtualPointerRef.current = movePointer(
+          virtualPointerRef.current,
+          pressedKeysRef.current,
+          dtMs,
+          WIDTH,
+          HEIGHT,
+        ))
+
     pointerRef.current = pointer
+
+    const currentState = engine.getState()
+    const shotEvent = gestureController.update({
+      dtMs,
+      rawPinchState,
+      trackingStatus: usingTrackedHand ? activeFrame.status : 'ready',
+      pointer,
+      ball: currentState.ball,
+      enabled: currentState.mode !== 'rolling' && currentState.mode !== 'win',
+    })
+
     engine.update(dtMs, {
       directionIntent: 'none',
       pointer,
       swipeSpeed: 0,
-      pinchState:
-        activeFrame.status === 'ready'
-          ? pinchStateFromDistance(activeFrame.derived.pinchDistance)
-          : pinchStateFromKeyboard(pressedKeysRef.current),
+      pinchState: rawPinchState,
       trackingStatus: activeFrame.status,
+      shotEvent,
     })
     syncState()
+
     const canvas = canvasRef.current
     if (canvas) {
-      drawScene(canvas, engine.getState(), walls, pointerRef.current, activeFrame.status)
+      drawScene(canvas, engine.getState(), pointerRef.current, activeFrame.status, walls)
     }
-  }, [engine, syncState, walls])
+  }, [engine, gestureController, syncState, walls])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       pressedKeysRef.current.add(event.code)
       if (event.code === 'KeyR') {
-        engine.reset()
-        syncState()
+        resetGame()
       }
     }
+
     const onKeyUp = (event: KeyboardEvent) => {
       pressedKeysRef.current.delete(event.code)
     }
+
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [engine, syncState])
+  }, [resetGame])
 
   useEffect(() => {
     registerActiveGameRuntime({
@@ -211,11 +502,21 @@ export function MiniGolfCanvas() {
             x: Math.round(currentState.ball.x),
             y: Math.round(currentState.ball.y),
           },
-          hole: currentState.hole,
+          hole: {
+            x: currentState.hole.x,
+            y: currentState.hole.y,
+          },
+          dragPoint: currentState.dragPoint
+            ? {
+                x: Math.round(currentState.dragPoint.x),
+                y: Math.round(currentState.dragPoint.y),
+              }
+            : null,
           pointer: {
             x: Math.round(pointerRef.current.x),
             y: Math.round(pointerRef.current.y),
           },
+          shotPreviewActive: currentState.mode === 'pinched' || currentState.mode === 'dragging',
           tracking: {
             status: handFrameRef.current.status,
             source: handFrameRef.current.source,
@@ -223,6 +524,7 @@ export function MiniGolfCanvas() {
         })
       },
     })
+
     return () => registerActiveGameRuntime(null)
   }, [engine, stepSimulation])
 
@@ -236,19 +538,21 @@ export function MiniGolfCanvas() {
       stepSimulation(Math.min(dt, 48))
       animationFrameRef.current = window.requestAnimationFrame(frame)
     }
+
     animationFrameRef.current = window.requestAnimationFrame(frame)
     return () => window.cancelAnimationFrame(animationFrameRef.current)
   }, [stepSimulation])
 
-  const resetGame = () => {
-    engine.reset()
-    syncState()
-  }
-
   return (
     <section className="game-layout">
       <div className="panel panel--canvas">
-        <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} className="game-canvas" />
+        <canvas
+          ref={canvasRef}
+          width={WIDTH}
+          height={HEIGHT}
+          className="game-canvas"
+          aria-label="Mini golf course"
+        />
       </div>
       <GameCameraCard debugButtonId="debug-golf-btn" />
       <section className="panel game-info-card">
@@ -274,9 +578,9 @@ export function MiniGolfCanvas() {
           </button>
         </div>
         <ul className="control-list">
-          <li>Point your fingertip where you want the putt to go.</li>
-          <li>Pinch and hold for power, then release to strike the ball.</li>
-          <li>Keyboard fallback: move aim with arrows or WASD, hold Space to charge.</li>
+          <li>Pinch close to the ball to grab the putt.</li>
+          <li>While pinched, drag backward to set direction and power.</li>
+          <li>Release the pinch to strike. Keyboard fallback: move with arrows or WASD, hold Space to grab, pull back, release.</li>
         </ul>
         <Link className="button button--ghost" to="/">
           Back to games

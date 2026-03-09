@@ -66,6 +66,23 @@ Original prompt: I want to build a website which has multiple games that can be 
   - add pinch-center derived tracking data and tests
   - add a stable mini-golf gesture controller with debounce/cancel coverage
   - update the mini-golf engine and renderer, then validate with Playwright screenshots
+
+- Mini-golf upgrade implemented:
+  - added thumb-tip + pinch-center derived tracking data for more stable pinch targeting
+  - replaced hold-to-charge mini-golf shots with a real putt gesture: pinch near the ball, drag backward while pinched, release to shoot
+  - added debounce/cancel handling so tracker loss or pinch jitter does not accidentally fire the ball
+  - upgraded mini-golf visuals to a richer 2.5D canvas scene with fairway shading, bunker lighting, dimensional barriers, a deeper cup/flag, and a more realistic ball + preview
+  - updated mini-golf text state to expose drag-point / preview data for automated validation
+- Verification after implementation:
+  - targeted mini-golf + hand tracking tests: `npm run test:run -- src/tracking/handMath.test.ts src/games/mini-golf/miniGolfGesture.test.ts src/games/mini-golf/miniGolfEngine.test.ts`
+  - full test suite: `npm run test:run`
+  - lint: `npm run lint`
+  - build: `npm run build`
+- Browser validation artifacts:
+  - required web-game client screenshot/state: `output/mini-golf-review-controls-4/shot-0.png`, `output/mini-golf-review-controls-4/state-0.json`
+  - direct debug-driven pinch shot validation (state reached rolling with 1 stroke): `output/mini-golf-debug-validation/state-0.json`, `output/mini-golf-debug-validation/shot-0.png`
+- Notes:
+  - the stock web-game client is good for screenshots/state capture, but its step model cannot hold a continuous pinch across separate action steps, so the real pinch-drag-release path was verified with a direct Playwright evaluation using `window.__arcadeDebug`
 2026-03-09
 - Approved a Fruit Ninja-specific upgrade direction before implementation:
   - bright cartoon fruit visuals
@@ -76,3 +93,54 @@ Original prompt: I want to build a website which has multiple games that can be 
 - Wrote the design doc at `docs/plans/2026-03-09-fruit-ninja-upgrade-design.md`.
 - Wrote the implementation plan at `docs/plans/2026-03-09-fruit-ninja-upgrade.md`.
 - Next step: execute the plan with TDD and validate the Fruit Ninja route with the Playwright web-game client plus screenshot review.
+- Fruit Ninja implementation:
+  - upgraded shared hand math with adaptive fingertip smoothing so small webcam jitter is damped before game input uses it
+  - expanded the Fruit Ninja engine to support slash-path detection, pause mode, fruit types, higher launch arcs, and seven-life loss handling
+  - replaced the old circle-based Fruit Ninja canvas with a bright cartoon market scene, hand/mouse/keyboard slash control, burst effects, and on-canvas start/pause/resume/restart buttons
+  - extended `render_game_to_text` with visible controls, lives remaining, fruit types, and pointer/slash state for deterministic validation
+- Added/updated automated coverage:
+  - `src/games/fruit-ninja/fruitNinjaEngine.test.ts`
+  - `src/tracking/handMath.test.ts`
+  - `src/games/mini-golf/MiniGolfCanvas.test.tsx`
+- Fixed a missing `MiniGolfCanvas` accessibility hook by adding an explicit canvas label so the restored mini-golf smoke test can verify the route shell and active runtime registration.
+- Final verification results:
+  - `npm run lint` PASS
+  - `npm run test:run` PASS
+  - `npm run build` PASS
+  - clean Fruit Ninja gameplay artifact with successful slicing: `output/fruit-final-play/shot-0.png` and `output/fruit-final-play/state-0.json` (`score: 2`)
+  - clean Fruit Ninja paused-controls artifact: `output/fruit-final-paused-clean/shot-0.png` and `output/fruit-final-paused-clean/state-0.json`
+- Remaining TODOs:
+  - run a real-webcam manual pass on Fruit Ninja to tune the slash threshold against actual hand speed, not only mouse/keyboard fallback
+  - consider seeding the Fruit Ninja RNG from a query param for fully deterministic browser choreography in future automated runs
+2026-03-09
+- Approved the Snake-specific upgrade direction before implementation:
+  - natural terrarium-style scene
+  - 2.5D rendering rather than full perspective
+  - direct finger-direction steering only
+- Wrote the Snake design doc at `docs/plans/2026-03-09-snake-terrarium-design.md`.
+- Wrote the Snake implementation plan at `docs/plans/2026-03-09-snake-terrarium-implementation.md`.
+- Reworked `src/games/snake/SnakeCanvas.tsx` into a terrarium renderer:
+  - glass enclosure framing, soil texture, terrarium decor, beetle-style food
+  - volumetric snake segments with highlights, underside shading, and contact shadows
+  - updated in-canvas overlays and title/pause/game-over presentation
+- Stabilized the shared camera card structure in `src/components/GameCameraCard.tsx` so preview, copy, and action regions keep a fixed footprint across permission/error states.
+- Added targeted UI tests:
+  - `src/components/GameCameraCard.test.tsx`
+  - `src/games/snake/SnakeCanvas.test.tsx`
+- Added a dev-only Snake route helper for deterministic validation: `?simulateHand=1` auto-enables the debug hand feed without changing normal webcam behavior.
+- Fixed build blockers uncovered during verification:
+  - restored a missing `src/games/mini-golf/MiniGolfCanvas.tsx`
+  - fixed the shared hand-math fallback `indexTip` type
+  - cleaned TypeScript issues in `src/games/mini-golf/miniGolfEngine.test.ts` and `src/games/snake/SnakeCanvas.test.tsx`
+- Verification completed:
+  - `npm run test:run -- src/components/GameCameraCard.test.tsx src/games/snake/SnakeCanvas.test.tsx src/games/snake/snakeEngine.test.ts src/games/snake/snakeInput.test.ts src/tracking/handMath.test.ts src/games/mini-golf/miniGolfEngine.test.ts src/games/mini-golf/miniGolfGesture.test.ts`
+  - `npm run build`
+  - Playwright web-game client on `http://127.0.0.1:4175/play/snake?simulateHand=1` with artifacts in `output/snake-terrarium/`
+- Latest Snake validation artifacts:
+  - gameplay screenshot: `output/snake-terrarium/shot-0.png`
+  - pause overlay screenshot: `output/snake-terrarium/shot-1.png`
+  - later gameplay screenshot: `output/snake-terrarium/shot-2.png`
+  - runtime state snapshots: `output/snake-terrarium/state-0.json`, `output/snake-terrarium/state-1.json`, `output/snake-terrarium/state-2.json`
+- Remaining TODOs:
+  - run one real-hardware webcam smoke test on Snake outside debug mode
+  - decide whether the dev-only `simulateHand=1` hook should be generalized for the other games' automated checks

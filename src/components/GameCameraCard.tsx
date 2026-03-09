@@ -24,21 +24,32 @@ export function GameCameraCard({ debugButtonId }: GameCameraCardProps) {
     void requestCamera()
   }, [cameraPermission, mediaStream, requestCamera, trackerMode])
 
+  const showRetry = cameraPermission === 'denied'
+  const helperCopy = trackerError
+    ? trackerError
+    : 'Move your fingertip. The dot shows the movement input.'
+
   return (
     <section className="panel game-camera-card">
       <div className="game-camera-card__header">
         <h2>Camera</h2>
         <span className="game-camera-card__hint">Green dot = fingertip</span>
       </div>
-      <WebcamPreview compact />
+      <div data-testid="camera-preview-region">
+        <WebcamPreview compact />
+      </div>
       <div className="game-camera-card__footer">
-        {trackerError ? <p>{trackerError}</p> : <p>Move your fingertip. The dot shows the movement input.</p>}
-        <div className="button-row">
-          {cameraPermission === 'denied' ? (
+        <p data-testid="camera-copy-region" className="game-camera-card__copy">
+          {helperCopy}
+        </p>
+        <div data-testid="camera-actions" className="game-camera-card__actions">
+          {showRetry ? (
             <button className="button button--ghost" type="button" onClick={() => void requestCamera()}>
               Retry camera
             </button>
-          ) : null}
+          ) : (
+            <span className="game-camera-card__action-slot" aria-hidden="true" />
+          )}
           {import.meta.env.DEV ? (
             <button
               id={debugButtonId}

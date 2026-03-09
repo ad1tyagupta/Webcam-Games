@@ -1,0 +1,1 @@
+{"route":"/play/snake","mode":"paused","coordinateSystem":"grid origin at top-left, x increases right, y increases down","board":{"cols":18,"rows":18},"snake":[{"x":8,"y":6},{"x":8,"y":7},{"x":9,"y":7}],"food":{"x":12,"y":3},"direction":"up","score":0,"moveCount":4,"directionIntent":"none","tracking":{"status":"ready","source":"debug","confidence":0.99}}
