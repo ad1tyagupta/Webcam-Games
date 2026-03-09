@@ -6,6 +6,18 @@ function clamp01(value: number) {
   return Math.max(0, Math.min(1, value))
 }
 
+function lerp(from: number, to: number, alpha: number) {
+  return from + ((to - from) * alpha)
+}
+
+function lerpPoint(from: LandmarkPoint, to: LandmarkPoint, alpha: number): LandmarkPoint {
+  return {
+    x: lerp(from.x, to.x, alpha),
+    y: lerp(from.y, to.y, alpha),
+    z: lerp(from.z, to.z, alpha),
+  }
+}
+
 function mirrorX(point: Vector2): Vector2 {
   return {
     x: 1 - point.x,
@@ -54,7 +66,9 @@ export function computeHandDerivedData(
     return {
       handCenter: { ...EMPTY_VECTOR },
       handSize: 0,
-      indexTip: { ...EMPTY_VECTOR },
+      thumbTip: { x: 0, y: 0, z: 0 },
+      indexTip: { x: 0, y: 0, z: 0 },
+      pinchCenter: { ...EMPTY_VECTOR },
       pointerVector: { ...EMPTY_VECTOR },
       pinchDistance: 0,
       swipeVelocity: { ...EMPTY_VECTOR },
@@ -76,6 +90,10 @@ export function computeHandDerivedData(
     x: ((rawIndexTip.x + rawMiddleTip.x) / 2) - wrist.x,
     y: ((rawIndexTip.y + rawMiddleTip.y) / 2) - wrist.y,
   })
+  const thumbTip = {
+    ...rawThumbTip,
+    x: 1 - rawThumbTip.x,
+  }
   const pointerVector = {
     x: -rawPointerVector.x,
     y: rawPointerVector.y,
@@ -84,21 +102,36 @@ export function computeHandDerivedData(
     ...rawIndexTip,
     x: 1 - rawIndexTip.x,
   }
+  const smoothingAlpha = previousFrame
+    ? 0.22 + (clamp01(distance(indexTip, previousFrame.derived.indexTip) / 0.12) * 0.56)
+    : 1
+  const smoothedThumbTip = previousFrame
+    ? lerpPoint(previousFrame.derived.thumbTip, thumbTip, smoothingAlpha)
+    : thumbTip
+  const smoothedIndexTip = previousFrame
+    ? lerpPoint(previousFrame.derived.indexTip, indexTip, smoothingAlpha)
+    : indexTip
+  const pinchCenter = {
+    x: (smoothedThumbTip.x + smoothedIndexTip.x) / 2,
+    y: (smoothedThumbTip.y + smoothedIndexTip.y) / 2,
+  }
   const pinchDistance = clamp01(distance(rawThumbTip, rawIndexTip) / handSize)
 
   let swipeVelocity = { ...EMPTY_VECTOR }
   if (previousFrame && timestampMs > previousFrame.timestampMs) {
     const dt = (timestampMs - previousFrame.timestampMs) / 1000
     swipeVelocity = {
-      x: (indexTip.x - previousFrame.derived.indexTip.x) / dt,
-      y: (indexTip.y - previousFrame.derived.indexTip.y) / dt,
+      x: (smoothedIndexTip.x - previousFrame.derived.indexTip.x) / dt,
+      y: (smoothedIndexTip.y - previousFrame.derived.indexTip.y) / dt,
     }
   }
 
   return {
     handCenter,
     handSize,
-    indexTip,
+    thumbTip: smoothedThumbTip,
+    indexTip: smoothedIndexTip,
+    pinchCenter,
     pointerVector,
     pinchDistance,
     swipeVelocity,
@@ -152,7 +185,9 @@ export function createEmptyHandFrame(status: HandFrame['status'], timestampMs = 
     derived: {
       handCenter: { ...EMPTY_VECTOR },
       handSize: 0,
-      indexTip: { ...EMPTY_VECTOR },
+      thumbTip: { x: 0, y: 0, z: 0 },
+      indexTip: { x: 0, y: 0, z: 0 },
+      pinchCenter: { ...EMPTY_VECTOR },
       pointerVector: { ...EMPTY_VECTOR },
       pinchDistance: 0,
       swipeVelocity: { ...EMPTY_VECTOR },

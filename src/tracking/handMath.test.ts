@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { HandFrame } from '../types/arcade'
 import { computeHandDerivedData, directionFromVector, pinchStateFromDistance } from './handMath'
 
 const landmarks = [
@@ -35,6 +36,28 @@ describe('handMath', () => {
     expect(derived.indexTip).toEqual({ x: 0.55, y: 0.28, z: 0 })
     expect(derived.thumbTip).toEqual({ x: 0.6, y: 0.45, z: 0 })
     expect(derived.pinchCenter).toEqual({ x: 0.575, y: 0.365 })
+  })
+
+  it('smooths small fingertip jitter across frames', () => {
+    const firstDerived = computeHandDerivedData(landmarks, 100)
+    const nextLandmarks = landmarks.map((point) => ({ ...point }))
+    nextLandmarks[8].x = 0.47
+
+    const previousFrame: HandFrame = {
+      status: 'ready',
+      source: 'debug',
+      timestampMs: 100,
+      handedness: 'Right',
+      confidence: 0.99,
+      landmarks,
+      derived: firstDerived,
+    }
+
+    const derived = computeHandDerivedData(nextLandmarks, 116, previousFrame)
+
+    expect(derived.indexTip.x).toBeGreaterThan(0.53)
+    expect(derived.indexTip.x).toBeLessThan(0.55)
+    expect(Math.abs(derived.swipeVelocity.x)).toBeLessThan(0.9)
   })
 
   it('maps vectors to the dominant axis direction', () => {

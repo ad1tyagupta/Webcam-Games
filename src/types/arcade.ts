@@ -18,7 +18,9 @@ export interface LandmarkPoint extends Vector2 {
 export interface HandDerivedData {
   handCenter: Vector2
   handSize: number
-  indexTip: Vector2
+  thumbTip: LandmarkPoint
+  indexTip: LandmarkPoint
+  pinchCenter: Vector2
   pointerVector: Vector2
   pinchDistance: number
   swipeVelocity: Vector2
@@ -40,6 +42,8 @@ export interface GameInput {
   swipeSpeed: number
   pinchState: PinchState
   trackingStatus: TrackingStatus
+  slashActive?: boolean
+  slashPath?: Vector2[]
 }
 
 export interface GameDefinition {
